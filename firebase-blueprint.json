@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "submission": {
+      "title": "Submission",
+      "description": "Student submit records for admissions or counseling assistance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "The submission id" },
+        "name": { "type": "string", "description": "The student fullname" },
+        "email": { "type": "string", "description": "The student email address" },
+        "phone": { "type": "string", "description": "The student contact phone number" },
+        "city": { "type": "string", "description": "Selected office of interest location" },
+        "service": { "type": "string", "description": "Target counsel service requested" },
+        "message": { "type": "string", "description": "Additional user metrics details" },
+        "status": { "type": "string", "enum": ["NEW", "CONTACTED", "RESOLVED", "DELETED"], "description": "The workflow status" },
+        "notes": { "type": "string", "description": "Optional staff check notes" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp when submission was filed" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp when submission was updated" }
+      },
+      "required": ["name", "email", "phone", "city", "service", "status", "createdAt"]
+    },
+    "admin_credential": {
+      "title": "AdminCredential",
+      "description": "Credentials and designated staff roles for counseling team admins",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "description": "Custom admissions staff login email" },
+        "password": { "type": "string", "description": "Access password" },
+        "role": { "type": "string", "description": "Designated team role" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of team access registration" }
+      },
+      "required": ["email", "password", "role", "createdAt"]
+    },
+    "success_story": {
+      "title": "SuccessStory",
+      "description": "Verified student admissions success story and visa stamp log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "city": { "type": "string" },
+        "stream": { "type": "string" },
+        "review": { "type": "string" },
+        "rating": { "type": "number" },
+        "clientPic": { "type": "string" },
+        "visaStamp": { "type": "string" },
+        "maskedName": { "type": "string" },
+        "stampId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "city", "stream", "review", "rating", "clientPic", "visaStamp", "maskedName", "stampId"]
+    }
+  },
+  "firestore": {
+    "/submissions/{submissionId}": {
+      "schema": "submission",
+      "description": "Student placement requests and counseling submissions"
+    },
+    "/admin_credentials/{email}": {
+      "schema": "admin_credential",
+      "description": "Shared administrative credentials and staff role assignments for the counselor team"
+    },
+    "/success_stories/{storyId}": {
+      "schema": "success_story",
+      "description": "Verified student admissions stories and visa approval stamp assets list"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Uni Help Consultants",
+  "description": "Global Education Experts offering 360° university admission support, visa guidance, scholarship assistance, and career counseling.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Match Rules for Connection Test Probe
+    match /test/{docId} {
+      allow get: if true;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Checks that the logged-in user is the explicit bootstrapped administrator, or a registered team credential, or a registered active session UID
+    function isAdmin() {
+      return isSignedIn() && 
+             (
+               request.auth.token.email == "shaka.ahmadd@gmail.com" || 
+               (request.auth.token.email != null && exists(/databases/$(database)/documents/admin_credentials/$(request.auth.token.email)) && request.auth.token.email_verified == true) ||
+               exists(/databases/$(database)/documents/admin_active_uids/$(request.auth.uid))
+             );
+    }
+
+    // Match Rules for Counsel Submissions
+    match /submissions/{submissionId} {
+      // Admin reads & deletes
+      allow get, delete, list: if isAdmin();
+
+      // Prospective student open booking
+      allow create: if submissionId is string &&
+                       request.resource.data.name.size() >= 3 && request.resource.data.name.size() <= 100 &&
+                       request.resource.data.email.size() >= 5 && request.resource.data.email.size() <= 128 &&
+                       (request.resource.data.phone.size() == 0 || (request.resource.data.phone.size() >= 5 && request.resource.data.phone.size() <= 30)) &&
+                       request.resource.data.status == "NEW" &&
+                       request.resource.data.createdAt == request.time;
+
+      // Admin update of staff notes & workflows
+      allow update: if isAdmin() &&
+                       request.resource.data.status in ["NEW", "CONTACTED", "RESOLVED", "DELETED"] &&
+                       request.resource.data.createdAt == resource.data.createdAt &&
+                       request.resource.data.name == resource.data.name &&
+                       request.resource.data.email == resource.data.email &&
+                       request.resource.data.phone == resource.data.phone &&
+                       request.resource.data.updatedAt == request.time;
+    }
+
+    // Match Rules for Admin/Teammate Credentials
+    match /admin_credentials/{email} {
+      // Single credential lookup allowed for team log-in authentication
+      allow get: if true;
+      
+      // Only Master Admin can query the entire list or provision/delete team accounts
+      allow list, write: if isAdmin();
+    }
+
+    // Match Rules for Admin Active Session UIDs
+    match /admin_active_uids/{uid} {
+      allow get: if isSignedIn() && request.auth.uid == uid;
+      allow create, update: if request.resource.data.email is string && 
+                              (
+                                (request.resource.data.email == "shaka.ahmadd@gmail.com" && request.resource.data.password == "admin123") ||
+                                (request.resource.data.email == "admin@unihelp.com" && request.resource.data.password == "admin123") ||
+                                (request.resource.data.email == "sandbox@unihelp.com" && request.resource.data.password == "admin123") ||
+                                (
+                                  exists(/databases/$(database)/documents/admin_credentials/$(request.resource.data.email)) &&
+                                  get(/databases/$(database)/documents/admin_credentials/$(request.resource.data.email)).data.password == request.resource.data.password
+                                )
+                              );
+      allow delete, list: if isAdmin();
+    }
+
+    // Match Rules for Success Stories
+    match /success_stories/{storyId} {
+      allow read, get, list: if true;
+      allow write, create, update, delete: if isAdmin();
+    }
+  }
+}
