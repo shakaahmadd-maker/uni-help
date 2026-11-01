@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  ADMISSIONS_COACH
+  VISA_SPECIALIST
+  OPERATIONS_LEAD
+  COUNSELOR
+}
+
+enum SubmissionStatus {
+  NEW
+  CONTACTED
+  RESOLVED
+  DELETED
+}
+
+model User {
+  id           String       @id @default(uuid())
+  email        String       @unique
+  passwordHash String
+  name         String?
+  role         Role         @default(ADMISSIONS_COACH)
+  isActive     Boolean      @default(true)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  lastLoginAt  DateTime?
+
+  assignedSubmissions Submission[]
+
+  @@index([email])
+  @@index([role])
+}
+
+model Submission {
+  id           String           @id @default(uuid())
+  legacyId     String?          @unique
+  name         String
+  email        String
+  phone        String?
+  city         String?
+  service      String
+  message      String           @db.Text
+  status       SubmissionStatus @default(NEW)
+  notes        String?          @db.Text
+  assignedToId String?
+  assignedTo   User?            @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([email])
+  @@index([status])
+  @@index([createdAt])
+  @@index([service])
+}
+
+model SuccessStory {
+  id            String   @id @default(uuid())
+  legacyId      String?  @unique
+  name          String
+  maskedName    String?
+  city          String
+  stream        String
+  review        String   @db.Text
+  rating        Int      @default(5)
+  clientPic     String?  @db.Text
+  visaStamp     String?  @db.Text
+  stampId       String?
+  visaGrantDate String?
+  isPublished   Boolean  @default(true)
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([city])
+  @@index([isPublished])
+  @@index([createdAt])
+}

@@ -1,0 +1,60 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: unihelp_postgres
+    restart: always
+    environment:
+      POSTGRES_DB: uni_help
+      POSTGRES_USER: uni_help_user
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-unihelp_secure_pass_2026}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - unihelp_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uni_help_user -d uni_help"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: unihelp_backend
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://uni_help_user:${DB_PASSWORD:-unihelp_secure_pass_2026}@postgres:5432/uni_help
+      JWT_SECRET: ${JWT_SECRET:-change_this_to_a_long_random_jwt_secret_in_prod}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - unihelp_net
+    ports:
+      # Internal port 4000 avoids conflicting with host port 3001
+      - "4000:4000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: unihelp_frontend
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - unihelp_net
+    ports:
+      - "80:80"
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  unihelp_net:
+    driver: bridge

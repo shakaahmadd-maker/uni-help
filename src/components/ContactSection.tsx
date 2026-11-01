@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Send, MapPin, Phone, Mail, CheckCircle, AlertTriangle, X, Check, Globe } from "lucide-react";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "../firebase";
+import { submissionsApi } from "../api/submissions";
 
 interface ContactSectionProps {
   initialServiceSelected: string;
@@ -182,25 +181,20 @@ export default function ContactSection({
       localQueue.unshift(localItem);
       localStorage.setItem("unihelp_local_submissions", JSON.stringify(localQueue));
 
-      // 2. Direct attempt to write into Cloud Firestore matching security rules matches
-      await setDoc(doc(db, "submissions", submissionId), {
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone,
-        city: payload.city,
-        service: payload.service,
-        message: payload.message,
-        status: payload.status,
-        createdAt: serverTimestamp(), // Enforces compliance with standard request.time inside firestore.rules
-      });
-
-      console.log("Successfully recorded application directly inside cloud database.");
-    } catch (saveError) {
-      console.warn("Firestore connection inactive or loading. Utilizing secure local backup queue.", saveError);
+      // 2. Direct attempt to write into PostgreSQL backend API
       try {
-        handleFirestoreError(saveError, OperationType.WRITE, `submissions/${submissionId}`);
-      } catch (errLogger) {
-        // Silently logged
+        await submissionsApi.create({
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          city: payload.city,
+          service: payload.service,
+          message: payload.message,
+          status: "NEW",
+        });
+        console.log("Successfully recorded application directly inside PostgreSQL database.");
+      } catch (saveError) {
+        console.warn("Backend API offline or loading. Utilizing secure local backup queue.", saveError);
       }
     } finally {
       setIsSubmitting(false);

@@ -7,8 +7,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { DESTINATIONS_DATA, Destination } from "../destinationsData";
-import { db } from "../firebase";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { submissionsApi } from "../api/submissions";
 
 // High-resolution visual cover images for the 21 unique destinations
 const DESTINATION_IMAGES: Record<string, string> = {
@@ -679,12 +678,11 @@ export default function DestinationsSection({
   const handleInquirySubmitReal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const submissionId = "sub_" + Math.random().toString(36).substring(2, 11);
       const targetCountry = procureCountryId === "deck_bulk" 
         ? `Deck Bulk Compare: ${compareList.map(item => item.name).join(", ")}`
         : (DESTINATIONS_DATA.find(d => d.id === procureCountryId)?.name || "Country Clearance Direct");
 
-      await setDoc(doc(db, "submissions", submissionId), {
+      await submissionsApi.create({
         name: procureName,
         email: procureEmail,
         phone: "",
@@ -692,7 +690,6 @@ export default function DestinationsSection({
         service: `Clearance: ${targetCountry}`,
         message: `Interactive rapid dossier request for academic level: ${procureDegree}, targeting timeline: ${procureStart}.`,
         status: "NEW",
-        createdAt: serverTimestamp()
       });
 
       setSuccessModal({
@@ -716,8 +713,7 @@ export default function DestinationsSection({
   const handleProfileEvaluationSubmitReal = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const submissionId = "sub_" + Math.random().toString(36).substring(2, 11);
-      await setDoc(doc(db, "submissions", submissionId), {
+      await submissionsApi.create({
         name: profileName,
         email: profileEmail,
         phone: "",
@@ -725,7 +721,6 @@ export default function DestinationsSection({
         service: `Intake Evaluation: ${profileIntake}`,
         message: `Evaluation Parameters:\nBudget: ${profileBudget}\nHighest Degree: ${profileDegree}\nPriorities & Majors: ${profilePriorities || "Intended major and part-time goals unspecified"}`,
         status: "NEW",
-        createdAt: serverTimestamp()
       });
 
       setSuccessModal({

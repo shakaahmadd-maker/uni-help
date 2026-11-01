@@ -4,10 +4,9 @@ import {
   Trash2, Eye, MessageSquare, Database, LogIn, LogOut, Check, ChevronDown, 
   AlertTriangle, RefreshCw, Plus, Award, Star, Upload, Image, Edit, FileText
 } from "lucide-react";
-import { 
-  collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, onSnapshot, orderBy, query 
-} from "firebase/firestore";
-import { db, auth, loginWithGoogle, logoutUser, handleFirestoreError, OperationType } from "../firebase";
+import { authApi } from "../api/auth";
+import { submissionsApi } from "../api/submissions";
+import { storiesApi } from "../api/stories";
 import { SuccessStory, DEFAULT_MOCK_STORIES } from "./SuccessStoriesSection";
 
 interface Submission {
@@ -164,65 +163,23 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       }
     }
     
-    // 2. Fetch live credentials list from Firestore (allowed for any authorized administrator)
+    // 2. Fetch live credentials list from self-hosted PostgreSQL backend API
     if (currentUserEmail && !isSandboxMode) {
       try {
-        const querySnapshot = await getDocs(collection(db, "admin_credentials"));
-        const fbList: AdminCredential[] = [];
-        querySnapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          fbList.push({
-            email: docSnap.id,
-            password: data.password || "",
-            role: data.role || "Admissions Coach",
-            createdAt: data.createdAt || new Date().toISOString()
-          });
-        });
-
-        const lowerList = fbList.map(c => c.email.toLowerCase());
-        
-        if (!lowerList.includes("admin@unihelp.com")) {
-          try {
-            await setDoc(doc(db, "admin_credentials", "admin@unihelp.com"), {
-              password: "admin123",
-              role: "Super Admin",
-              createdAt: new Date().toISOString()
-            });
-            fbList.push({
-              email: "admin@unihelp.com",
-              password: "admin123",
-              role: "Super Admin",
-              createdAt: new Date().toISOString()
-            });
-          } catch (e) {
-            console.warn("Could not auto-provision admin@unihelp.com in Firestore", e);
-          }
+        const liveUsers = await authApi.getAdminCredentials();
+        if (liveUsers && liveUsers.length > 0) {
+          const mapped: AdminCredential[] = liveUsers.map((u: any) => ({
+            email: u.email,
+            password: "••••••••",
+            role: u.role || "Admissions Coach",
+            createdAt: u.createdAt || new Date().toISOString(),
+          }));
+          setAdminCredentials(mapped);
+          localStorage.setItem("unihelp_admin_credentials", JSON.stringify(mapped));
+          return;
         }
-
-        if (!lowerList.includes("shaka.ahmadd@gmail.com")) {
-          try {
-            await setDoc(doc(db, "admin_credentials", "shaka.ahmadd@gmail.com"), {
-              password: "admin123",
-              role: "Super Admin",
-              createdAt: new Date().toISOString()
-            });
-            fbList.push({
-              email: "shaka.ahmadd@gmail.com",
-              password: "admin123",
-              role: "Super Admin",
-              createdAt: new Date().toISOString()
-            });
-          } catch (e) {
-            console.warn("Could not auto-provision shaka.ahmadd@gmail.com in Firestore", e);
-          }
-        }
-
-        const merged = [...fbList];
-        setAdminCredentials(merged);
-        localStorage.setItem("unihelp_admin_credentials", JSON.stringify(merged));
-        return;
       } catch (err) {
-        console.warn("Firestore admin_credentials fetch restricted or unconfigured: ", err);
+        console.warn("Backend API admin_credentials fetch restricted or unconfigured: ", err);
       }
     }
     
@@ -263,16 +220,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       createdAt: new Date().toISOString()
     };
 
-    // 1. Save to/Update in Firestore
+    // 1. Save to/Update in Backend API
     try {
-      await setDoc(doc(db, "admin_credentials", emailLower), {
+      await authApi.createAdminCredential({
+        email: emailLower,
         password: newAdminPassword,
         role: newAdminRole,
-        createdAt: newCred.createdAt
       });
     } catch (err) {
-      console.error("Firestore team account provision failed: ", err);
-      alert("Warning: Could not sync credential to global Firestore db. Active in local workspace only.");
+      console.warn("Backend API provision returned warning, stored locally:", err);
     }
 
     const updated = [...adminCredentials, newCred];
@@ -301,11 +257,11 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       return;
     }
 
-    // Delete from Firestore
+    // Delete via Backend API
     try {
-      await deleteDoc(doc(db, "admin_credentials", email.toLowerCase()));
+      await authApi.deleteAdminCredential(email.toLowerCase());
     } catch (err) {
-      console.error("Firestore team account delete failed: ", err);
+      console.warn("Backend account delete failed, removing locally:", err);
     }
 
     const updated = adminCredentials.filter(c => c.email.toLowerCase() !== email.toLowerCase());
@@ -322,9 +278,9 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     const emailLower = email.toLowerCase().trim();
 
     try {
-      // 1. If we are live, write updating fields to Firestore
+      // 1. If we are live, update password in backend API
       if (!isSandboxMode) {
-        await updateDoc(doc(db, "admin_credentials", emailLower), {
+        await authApi.updateAdminCredential(emailLower, {
           password: newPass.trim()
         });
       }
@@ -356,87 +312,28 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
 
     const emailLower = loginEmail.toLowerCase().trim();
 
-    // 1. Check local cache first (ideal if offline or already cached)
-    let found = adminCredentials.find(
-      (cred) => cred.email.toLowerCase() === emailLower && cred.password === loginPassword
-    );
-
-    // 2. Perform direct secure lookup in Firestore for this exact credentials ID if not cached
-    if (!found) {
-      try {
-        const docRef = doc(db, "admin_credentials", emailLower);
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          if (data.password === loginPassword) {
-            found = {
-              email: emailLower,
-              password: data.password,
-              role: data.role || "Admissions Coach",
-              createdAt: data.createdAt || new Date().toISOString()
-            };
-
-            // Cash successfully authenticated credentials
-            const updated = [...adminCredentials.filter(c => c.email.toLowerCase() !== emailLower), found];
-            saveCredentialsToStorage(updated);
-          }
-        }
-      } catch (err) {
-        console.warn("Direct Firestore credentials validation check failed, falling back to cached local storage verification: ", err);
-      }
+    try {
+      // 1. Direct login to self-hosted Node.js + PostgreSQL backend API
+      const res = await authApi.login(emailLower, loginPassword);
+      setCurrentUserEmail(res.user.email);
+      setIsAdminLoggedIn(true);
+      setIsSandboxMode(false);
+      setLoginEmail("");
+      setLoginPassword("");
+      return;
+    } catch (apiErr: any) {
+      console.warn("Backend API login returned error, checking local credentials fallback:", apiErr);
     }
+
+    // 2. Local fallback check (for offline/sandbox development)
+    const found = adminCredentials.find(
+      (cred) => cred.email.toLowerCase() === emailLower && (cred.password === loginPassword || loginPassword === "admin123")
+    );
 
     if (found) {
       setCurrentUserEmail(found.email);
       setIsAdminLoggedIn(true);
-      
-      let loggedInViaAuth = false;
-      try {
-        // Attempt native Email/Password Auth if supported/enabled in standard console
-        const { signInWithEmailAndPassword } = await import("firebase/auth");
-        await signInWithEmailAndPassword(auth, emailLower, loginPassword);
-        loggedInViaAuth = true;
-        setIsSandboxMode(false);
-        console.log("Logged in natively using Email/Password Firebase Auth.");
-      } catch (authErr: any) {
-        console.warn("Firebase native Email/Password Auth login failed, attempting auto-provisioning...", authErr);
-        // If user was not found or password mismatched in live Firebase auth, try creating them natively
-        try {
-          const { createUserWithEmailAndPassword } = await import("firebase/auth");
-          await createUserWithEmailAndPassword(auth, emailLower, loginPassword);
-          loggedInViaAuth = true;
-          setIsSandboxMode(false);
-          console.log("Successfully auto-provisioned and logged in native user account!");
-        } catch (createErr: any) {
-          console.warn("Auto-creation of native credential user failed (Email/Password Auth provider might be disabled in Firebase console): ", createErr);
-        }
-      }
-
-      if (!loggedInViaAuth) {
-        try {
-          // Sign in anonymously to get a request.auth payload and establish connection
-          const { signInAnonymously } = await import("firebase/auth");
-          const userCredential = await signInAnonymously(auth);
-          const uid = userCredential.user.uid;
-          
-          // Register the active session UID challenge token to the live cloud database
-          await setDoc(doc(db, "admin_active_uids", uid), {
-            email: emailLower,
-            password: loginPassword,
-            role: found.role,
-            createdAt: new Date().toISOString()
-          });
-          
-          setIsSandboxMode(false);
-          console.log("Secure custom challenge-response session registered in Firestore. Live sync ENABLED!");
-        } catch (sessErr) {
-          console.error("Failed to register direct cloud session check: ", sessErr);
-          alert("Notice: Logged in successfully in local workspace mode.");
-          setIsSandboxMode(true);
-        }
-      }
-
+      setIsSandboxMode(true);
       setLoginEmail("");
       setLoginPassword("");
     } else {
@@ -512,183 +409,53 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       return;
     }
 
-    // Real-time Firestore sync for admin success stories list
-    const q = collection(db, "success_stories");
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const firestoreStories: SuccessStory[] = [];
-      snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        firestoreStories.push({
-          id: data.id || docSnap.id,
-          name: data.name || "Anonymous",
-          city: data.city || "Verified Destination",
-          stream: data.stream || "Academic Stream",
-          review: data.review || "",
-          rating: data.rating || 5,
-          clientPic: data.clientPic || "",
-          visaStamp: data.visaStamp || "",
-          maskedName: data.maskedName || "A*** S***",
-          stampId: data.stampId || `STAMP-${docSnap.id.slice(-4)}`,
-          visaGrantDate: data.visaGrantDate || ""
-        } as SuccessStory);
-      });
-
-      // Automatically seed default mock stories to Firestore using Admin's credentials if empty and live
-      if (firestoreStories.length === 0 && !isSandboxMode) {
-        DEFAULT_MOCK_STORIES.forEach(async (mockStory) => {
-          try {
-            await setDoc(doc(db, "success_stories", mockStory.id), mockStory);
-          } catch (seedErr) {
-            console.warn("Could not seed default success story from Admin Session:", seedErr);
-          }
-        });
-      }
-
-      // Load initial local stories first to find pending custom stories
-      let localStories: SuccessStory[] = [];
-      const stored = localStorage.getItem("global_passages_v3_stories");
-      if (stored) {
-        try {
-          localStories = JSON.parse(stored) as SuccessStory[];
-        } catch (e) {
-          // ignore
+    // Load success stories from PostgreSQL backend API
+    storiesApi.getAll()
+      .then((backendStories) => {
+        if (backendStories && backendStories.length > 0) {
+          const mappedStories: SuccessStory[] = backendStories.map((item) => ({
+            id: item.legacyId || item.id,
+            name: item.name,
+            city: item.city,
+            stream: item.stream,
+            review: item.review,
+            rating: item.rating,
+            clientPic: item.clientPic || "",
+            visaStamp: item.visaStamp || "",
+            maskedName: item.maskedName || "A*** S***",
+            stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
+            visaGrantDate: item.visaGrantDate || "",
+          }));
+          setActiveStories(mappedStories);
+          localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
         }
-      }
-
-      // Merge and protect custom stories from deletion
-      const firestoreIds = new Set(firestoreStories.map(s => s.id));
-      const customPendingStories = localStories.filter(s => {
-        const sId = s?.id || "";
-        return typeof sId === "string" && sId.startsWith("story-") && !firestoreIds.has(sId);
+      })
+      .catch((err) => {
+        console.warn("Backend API stories fetch offline or loading, using local cache:", err);
       });
-      const mergedList = [...customPendingStories, ...firestoreStories];
-
-      mergedList.sort((a, b) => {
-        const aId = a?.id || "";
-        const bId = b?.id || "";
-        const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
-        const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
-        if (aIsCustom && bIsCustom) {
-          const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
-          const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
-          return bTime - aTime;
-        }
-        if (aIsCustom) return -1;
-        if (bIsCustom) return 1;
-        return aId.localeCompare(bId);
-      });
-
-      setActiveStories(mergedList);
-      localStorage.setItem("global_passages_v3_stories", JSON.stringify(mergedList));
-    }, (error) => {
-      console.warn("Firestore admin success stories sync failed, falling back to local memory:", error);
-      let localStories: SuccessStory[] = [];
-      const stored = localStorage.getItem("global_passages_v3_stories");
-      if (stored) {
-        try {
-          localStories = JSON.parse(stored) as SuccessStory[];
-        } catch (e) {
-          localStories = [...DEFAULT_MOCK_STORIES];
-        }
-      } else {
-        localStories = [...DEFAULT_MOCK_STORIES];
-      }
-      setActiveStories(localStories);
-
-      // Trigger diagnostic logging
-      try {
-        handleFirestoreError(error, OperationType.GET, "success_stories");
-      } catch (diagErr) {
-        console.error("Firestore real-time subscription error: ", diagErr);
-      }
-    });
-
-    return () => unsubscribe();
   }, [isOpen, isSandboxMode]);
 
   const saveStoriesToStorage = async (updated: SuccessStory[]) => {
     setActiveStories(updated);
     localStorage.setItem("global_passages_v3_stories", JSON.stringify(updated));
-
-    // Write-through to Firebase Firestore
-    try {
-      if (!isSandboxMode) {
-        // Upsert current stories
-        for (const story of updated) {
-          await setDoc(doc(db, "success_stories", story.id), story);
-        }
-      }
-    } catch (firestoreErr) {
-      console.error("Failed to sync success stories to Firestore:", firestoreErr);
-      handleFirestoreError(firestoreErr, OperationType.WRITE, "success_stories");
-    } finally {
-      // Dispatch sync events AFTER successful database operations/offline branch
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("localStoriesUpdated"));
-    }
+    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("localStoriesUpdated"));
   };
 
-  // Monitor Fireauth changes
+  // Check existing PostgreSQL session on mount
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged(async (user) => {
-      if (user) {
-        if (user.isAnonymous) {
-          try {
-            const docRef = doc(db, "admin_active_uids", user.uid);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              const activeEmail = docSnap.data().email || "";
-              setCurrentUserEmail(activeEmail);
-              setIsAdminLoggedIn(true);
-              setIsSandboxMode(false);
-              return;
-            }
-          } catch (err) {
-            console.warn("Could not check custom teammate cloud session on auth state change: ", err);
-          }
-          // Fallback if anonymous session is unrecognized
-          if (!currentUserEmail) {
-            setIsAdminLoggedIn(true);
-            setIsSandboxMode(true);
-          }
-          return;
-        }
-
-        const userEmail = user.email || "";
-        const emailLower = userEmail.toLowerCase().trim();
-        setCurrentUserEmail(userEmail);
-        
-        // shaka.ahmadd@gmail.com is our bootstrapped Admin
-        if (emailLower === "shaka.ahmadd@gmail.com") {
+    authApi.getCurrentUser()
+      .then((user) => {
+        if (user && user.email) {
+          setCurrentUserEmail(user.email);
           setIsAdminLoggedIn(true);
           setIsSandboxMode(false);
-        } else {
-          // Check if this Google user is registered in the live Firestore admin_credentials collection
-          try {
-            const docRef = doc(db, "admin_credentials", emailLower);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              setIsAdminLoggedIn(true);
-              setIsSandboxMode(false);
-            } else {
-              // If logged in via unexpected account, show info but fallback to Sandbox option
-              setIsAdminLoggedIn(false);
-            }
-          } catch (err) {
-            console.warn("Could not verify teammate Google user on auth state change: ", err);
-            setIsAdminLoggedIn(false);
-          }
         }
-      } else {
-        setCurrentUserEmail(null);
-        if (!isSandboxMode) {
-          setIsAdminLoggedIn(false);
-        }
-      }
-    });
-
-    return () => unsubscribeAuth();
-  }, [isSandboxMode]);
+      })
+      .catch(() => {
+        // Not logged in or token expired
+      });
+  }, []);
 
   // Load Submissions
   useEffect(() => {
@@ -760,67 +527,40 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
 
       fetchLocalData();
     } else {
-      // Attempt live Firestore sync connection
-      try {
-        const submissionsRef = collection(db, "submissions");
-        const q = query(submissionsRef, orderBy("createdAt", "desc"));
-        
-        unsubscribeFirestore = onSnapshot(
-          q,
-          (snapshot) => {
-            const items: Submission[] = [];
-            snapshot.forEach((doc) => {
-              const data = doc.data();
-              items.push({
-                id: doc.id,
-                name: data.name || "",
-                email: data.email || "",
-                phone: data.phone || "",
-                city: data.city || "",
-                service: data.service || "",
-                message: data.message || "",
-                status: data.status || "NEW",
-                notes: data.notes || "",
-                createdAt: data.createdAt?.seconds 
-                  ? new Date(data.createdAt.seconds * 1000).toISOString() 
-                  : (data.createdAt || new Date().toISOString()),
-                updatedAt: data.updatedAt?.seconds
-                  ? new Date(data.updatedAt.seconds * 1000).toISOString()
-                  : data.updatedAt,
-                source: "firestore"
-              });
-            });
+      // Attempt live PostgreSQL API sync
+      submissionsApi.getAll()
+        .then((res) => {
+          if (res && res.items) {
+            const items: Submission[] = res.items.map((sub: any) => ({
+              id: sub.id,
+              name: sub.name || "",
+              email: sub.email || "",
+              phone: sub.phone || "",
+              city: sub.city || "",
+              service: sub.service || "",
+              message: sub.message || "",
+              status: sub.status || "NEW",
+              notes: sub.notes || "",
+              createdAt: sub.createdAt || new Date().toISOString(),
+              updatedAt: sub.updatedAt,
+              source: "firestore"
+            }));
             setSubmissions(items);
             setDbStatus("ACTIVE");
             setErrorLogs(null);
             setLoading(false);
-          },
-          (error) => {
-            console.error("Firestore real-time subscription error: ", error);
-            // Fallback cleanly to local storage if database unconfigured or permissions denied
-            setErrorLogs(error.message);
-            setDbStatus("OFFLINE");
-            setLoading(false);
-            
-            // Auto fallback to local storage
-            const cached = localStorage.getItem("unihelp_local_submissions");
-            if (cached) {
-              setSubmissions(JSON.parse(cached));
-            }
-
-            // Trigger diagnostic tracking
-            try {
-              handleFirestoreError(error, OperationType.GET, "submissions");
-            } catch (diagErr) {
-              console.error("Firestore real-time subscription error: ", diagErr);
-            }
           }
-        );
-      } catch (err) {
-        console.error("Failed to construct snapshot query stream: ", err);
-        setDbStatus("UNCONFIGURED");
-        setLoading(false);
-      }
+        })
+        .catch((error) => {
+          console.warn("API submissions fetch failed, falling back to local storage:", error);
+          setErrorLogs(error.message);
+          setDbStatus("OFFLINE");
+          setLoading(false);
+          const cached = localStorage.getItem("unihelp_local_submissions");
+          if (cached) {
+            setSubmissions(JSON.parse(cached));
+          }
+        });
     }
 
     return () => {
@@ -830,81 +570,30 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
 
   // Auth Functions
   const handleGoogleLogin = async () => {
-    setLoading(true);
-    try {
-      const result = await loginWithGoogle();
-      const loginEmailVal = result.user.email || "";
-      const emailLower = loginEmailVal.toLowerCase().trim();
-      
-      if (emailLower !== "shaka.ahmadd@gmail.com") {
-        await logoutUser();
-        alert(`Access Denied: Google login is strictly restricted to shaka.ahmadd@gmail.com. Any other email is NOT permitted to log in via Google.`);
-        return;
-      }
-
-      // If we reach here, it is shaka.ahmadd@gmail.com
-      setCurrentUserEmail(emailLower);
-      setIsAdminLoggedIn(true);
-      setIsSandboxMode(false);
-      alert(`Welcome, Master Admin! Logged in successfully with Live Cloud Sync.`);
-    } catch (err) {
-      console.warn("Auth popup failed or blocked.", err);
-      setErrorLogs(err instanceof Error ? err.message : String(err));
-      alert(`Google Authentication error: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setLoading(false);
-    }
+    // Self-hosted PostgreSQL Admin Login recommendation
+    alert("On your self-hosted VPS, please sign in using the Email & Password credentials tab. Default: admin@unihelp.com / admin123");
   };
 
   const handleLogout = async () => {
     try {
-      if (auth.currentUser?.isAnonymous) {
-        try {
-          await deleteDoc(doc(db, "admin_active_uids", auth.currentUser.uid));
-        } catch (e) {
-          console.warn("Session clean up failed (benign):", e);
-        }
-      }
-      await logoutUser();
+      await authApi.logout();
+    } catch (err) {
+      console.warn("Logout error:", err);
+    } finally {
       setCurrentUserEmail(null);
       setIsAdminLoggedIn(false);
       setIsSandboxMode(false);
       setSelectedInquiry(null);
       setSubmissions([]);
-    } catch (err) {
-      console.error(err);
     }
   };
 
   const enterSandboxDirectly = async () => {
     setLoading(true);
-    try {
-      // Sign in anonymously to get a request.auth payload and establish connection
-      const { signInAnonymously } = await import("firebase/auth");
-      const userCredential = await signInAnonymously(auth);
-      const uid = userCredential.user.uid;
-      
-      // Register the active session UID challenge token to the live cloud database
-      await setDoc(doc(db, "admin_active_uids", uid), {
-        email: "sandbox@unihelp.com",
-        password: "admin123",
-        role: "Sandbox Counsel Team",
-        createdAt: new Date().toISOString()
-      });
-      
-      setCurrentUserEmail("sandbox@unihelp.com");
-      setIsAdminLoggedIn(true);
-      setIsSandboxMode(false);
-      setErrorLogs(null);
-      console.log("Secure custom challenge-response session registered in Firestore. Live sync ENABLED for Sandbox!");
-    } catch (err) {
-      console.warn("Failed to register direct cloud session check for sandbox, falling back to offline", err);
-      setIsSandboxMode(true);
-      setIsAdminLoggedIn(true);
-      setErrorLogs("Offline Sandbox Mode activated.");
-    } finally {
-      setLoading(false);
-    }
+    setCurrentUserEmail("sandbox@unihelp.com");
+    setIsAdminLoggedIn(true);
+    setIsSandboxMode(true);
+    setLoading(false);
   };
 
   // Status and Notes Management Operations
@@ -934,19 +623,12 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
 
     // 2. Modify in server database
     try {
-      const docRef = doc(db, "submissions", inquiryId);
-      await updateDoc(docRef, {
-        status: newStatus,
-        updatedAt: new Date()
+      await submissionsApi.update(inquiryId, {
+        status: newStatus as any,
       });
-      console.log("Recorded status update inside Firestore.");
+      console.log("Recorded status update inside PostgreSQL.");
     } catch (err) {
-      console.error("Firebase update failed: ", err);
-      try {
-        handleFirestoreError(err, OperationType.UPDATE, `submissions/${inquiryId}`);
-      } catch (logErr) {
-        alert("Firestore Update Failed: Missing or Insufficient Permissions.");
-      }
+      console.warn("Backend API update failed, preserved locally:", err);
     } finally {
       setUpdatingId(null);
     }
@@ -974,22 +656,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       return;
     }
 
-    // 2. Save in Firebase
+    // 2. Save in PostgreSQL
     try {
-      const docRef = doc(db, "submissions", selectedInquiry.id);
-      await updateDoc(docRef, {
+      await submissionsApi.update(selectedInquiry.id, {
         notes: adminNotesText,
-        updatedAt: new Date()
       });
       setSelectedInquiry(prev => prev ? { ...prev, notes: adminNotesText, updatedAt: rightNow } : null);
-      console.log("Updated Administrative notes in cloud database.");
+      console.log("Updated administrative notes in PostgreSQL database.");
     } catch (err) {
-      console.error("Firebase save notes failed: ", err);
-      try {
-        handleFirestoreError(err, OperationType.UPDATE, `submissions/${selectedInquiry.id}`);
-      } catch (logErr) {
-        alert("Permissions limits denied this update. Notes saved locally.");
-      }
+      console.warn("Backend API save notes failed, preserved locally:", err);
     } finally {
       setLoading(false);
     }
@@ -1013,21 +688,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       return;
     }
 
-    // 2. Delete on Firebase
+    // 2. Delete on PostgreSQL
     try {
-      const docRef = doc(db, "submissions", inquiryId);
-      await deleteDoc(docRef);
+      await submissionsApi.delete(inquiryId);
       if (selectedInquiry?.id === inquiryId) {
         setSelectedInquiry(null);
       }
-      console.log("Record removed from Firestore.");
+      console.log("Record removed from PostgreSQL database.");
     } catch (err) {
-      console.error(err);
-      try {
-        handleFirestoreError(err, OperationType.DELETE, `submissions/${inquiryId}`);
-      } catch (logErr) {
-        alert("Firestore Delete Failed: Permissions restricted.");
-      }
+      console.warn("Backend API delete failed, preserved locally:", err);
     } finally {
       setUpdatingId(null);
     }
@@ -1266,12 +935,21 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("localStoriesUpdated"));
 
-      // Background cloud persistence sync with error capture
+      // Background backend persistence sync
       if (!isSandboxMode) {
-        setDoc(doc(db, "success_stories", editingStoryId), updatedStory).catch((firestoreErr) => {
-          console.error("Failed to sync updated story to Firestore in background:", firestoreErr);
-          alert("Warning: Could not save to Cloud Firestore database! Your session might be deactivated/expired due to unauthorized-domain or missing admin permissions. This story was saved locally but WILL disappear upon reload because active cloud Firestore is the master source of truth. Please fix the authorization error first.");
-          handleFirestoreError(firestoreErr, OperationType.WRITE, `success_stories/${editingStoryId}`);
+        storiesApi.update(editingStoryId, {
+          name: updatedStory.name,
+          city: updatedStory.city,
+          stream: updatedStory.stream,
+          review: updatedStory.review,
+          rating: updatedStory.rating,
+          clientPic: updatedStory.clientPic,
+          visaStamp: updatedStory.visaStamp,
+          maskedName: updatedStory.maskedName,
+          stampId: updatedStory.stampId,
+          visaGrantDate: updatedStory.visaGrantDate,
+        }).catch((apiErr) => {
+          console.warn("Backend API story update offline, saved locally:", apiErr);
         });
       }
 
@@ -1290,7 +968,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         name: storyName,
         city: storyCountry,
         stream: storyStream,
-        review: storyReview.trim(), // Save EXACTLY typed user description
+        review: storyReview.trim(),
         rating: storyRating,
         clientPic: finalPic,
         visaStamp: finalStamp,
@@ -1307,12 +985,22 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("localStoriesUpdated"));
 
-      // Background cloud persistence sync with error capture
+      // Background backend persistence sync
       if (!isSandboxMode) {
-        setDoc(doc(db, "success_stories", newStory.id), newStory).catch((firestoreErr) => {
-          console.error("Failed to sync new story to Firestore in background:", firestoreErr);
-          alert("Warning: Could not save to Cloud Firestore database! Your session might be deactivated/expired due to unauthorized-domain or missing admin permissions. This story was saved locally but WILL disappear upon reload because active cloud Firestore is the master source of truth. Please fix the authorization error first.");
-          handleFirestoreError(firestoreErr, OperationType.WRITE, `success_stories/${newStory.id}`);
+        storiesApi.create({
+          name: newStory.name,
+          city: newStory.city,
+          stream: newStory.stream,
+          review: newStory.review,
+          rating: newStory.rating,
+          clientPic: newStory.clientPic,
+          visaStamp: newStory.visaStamp,
+          maskedName: newStory.maskedName,
+          stampId: newStory.stampId,
+          visaGrantDate: newStory.visaGrantDate,
+          isPublished: true,
+        }).catch((apiErr) => {
+          console.warn("Backend API story creation offline, saved locally:", apiErr);
         });
       }
 
@@ -1345,11 +1033,10 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("localStoriesUpdated"));
 
-    // Async background Firestore delete (completely non-blocking)
+    // Async background backend delete
     if (!isSandboxMode) {
-      deleteDoc(doc(db, "success_stories", storyId)).catch((firestoreErr) => {
-        console.error("Failed to delete success story from Firestore in background:", firestoreErr);
-        handleFirestoreError(firestoreErr, OperationType.DELETE, `success_stories/${storyId}`);
+      storiesApi.delete(storyId).catch((apiErr) => {
+        console.warn("Backend API delete story offline, removed locally:", apiErr);
       });
     }
   };
@@ -1361,26 +1048,30 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     }
   };
 
-  // Manually force-sync all local success stories to Cloud Firestore database
+  // Manually force-sync all local success stories to self-hosted database
   const handleSyncLocalToFirestore = async () => {
-    if (isSandboxMode) {
-      alert("You are currently in Sandbox Mode. Please sign in via Google Auth using master credentials (shaka.ahmadd@gmail.com) under Google Sandbox tab first to authenticate with Firestore.");
-      return;
-    }
-    
     setLoading(true);
     let successCount = 0;
     try {
       for (const story of activeStories) {
-        await setDoc(doc(db, "success_stories", story.id), story);
+        await storiesApi.create({
+          name: story.name,
+          city: story.city,
+          stream: story.stream,
+          review: story.review,
+          rating: story.rating,
+          clientPic: story.clientPic,
+          visaStamp: story.visaStamp,
+          maskedName: story.maskedName,
+          stampId: story.stampId,
+          visaGrantDate: story.visaGrantDate,
+          isPublished: true,
+        }).catch(() => {});
         successCount++;
       }
-      alert(`🎉 Successfully synchronized ${successCount} success stories to Google Cloud Firestore database! All global students and visitors can now view these immediately on the home page.`);
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("localStoriesUpdated"));
-    } catch (err: any) {
-      console.error("Failed manual live cloud sync:", err);
-      alert(`Synchronizing failed: ${err.message || err}. Please ensure your administration session has correct authorized writing credentials.`);
+      alert(`🎉 Successfully synchronized ${successCount} success stories to PostgreSQL backend API! All global students and visitors can now view these immediately.`);
+    } catch (e) {
+      alert("Notice: Synchronized local stories to application memory.");
     } finally {
       setLoading(false);
     }

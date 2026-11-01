@@ -5,8 +5,7 @@ import {
   Upload, User, X, Filter, Sparkles, RefreshCw, LogOut, Check, Info, FileText,
   ChevronLeft, ChevronRight, Play, Pause, Search, ArrowLeft, ArrowRight
 } from "lucide-react";
-import { collection, getDocs, doc, setDoc, onSnapshot } from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "../firebase";
+import { storiesApi } from "../api/stories";
 
 // Initial set of default mock successes matching the specified HTML layout
 export const DEFAULT_MOCK_STORIES = [
@@ -259,120 +258,35 @@ export default function SuccessStoriesSection({
     };
 
     if (!isSandboxActive) {
-      // Real-time Firestore synchronizer
-      const q = collection(db, "success_stories");
-      unsubscribe = onSnapshot(q, (snapshot) => {
-        const firestoreStories: SuccessStory[] = [];
-        snapshot.forEach((docSnap) => {
-          const data = docSnap.data();
-          firestoreStories.push({
-            id: data.id || docSnap.id,
-            name: data.name || "Anonymous",
-            city: data.city || "Verified Destination",
-            stream: data.stream || "Academic Stream",
-            review: data.review || "",
-            rating: data.rating || 5,
-            clientPic: data.clientPic || "",
-            visaStamp: data.visaStamp || "",
-            maskedName: data.maskedName || "A*** S***",
-            stampId: data.stampId || `STAMP-${docSnap.id.slice(-4)}`,
-            visaGrantDate: data.visaGrantDate || ""
-          } as SuccessStory);
+      // Fetch verified success stories from PostgreSQL backend API
+      storiesApi
+        .getAll()
+        .then((backendStories) => {
+          if (backendStories && backendStories.length > 0) {
+            const mappedStories: SuccessStory[] = backendStories.map((item) => ({
+              id: item.legacyId || item.id,
+              name: item.name,
+              city: item.city,
+              stream: item.stream,
+              review: item.review,
+              rating: item.rating,
+              clientPic: item.clientPic || "",
+              visaStamp: item.visaStamp || "",
+              maskedName: item.maskedName || "A*** S***",
+              stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
+              visaGrantDate: item.visaGrantDate || "",
+            }));
+            lastFirestoreStories.current = mappedStories;
+            setActiveStories(mappedStories);
+            localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
+          } else {
+            handleLocalUpdate();
+          }
+        })
+        .catch((err) => {
+          console.warn("Backend API stories fetch offline or loading, using local cache:", err);
+          handleLocalUpdate();
         });
-
-        lastFirestoreStories.current = firestoreStories;
-
-        // Load current local stories
-        let localStories: SuccessStory[] = [];
-        const stored = localStorage.getItem("global_passages_v3_stories");
-        if (stored) {
-          try {
-            localStories = JSON.parse(stored) as SuccessStory[];
-          } catch (e) {
-            // ignore
-          }
-        }
-
-        // Seed default mock stories to Firestore if it is completely empty
-        if (firestoreStories.length === 0) {
-          DEFAULT_MOCK_STORIES.forEach(async (mockStory) => {
-            try {
-              await setDoc(doc(db, "success_stories", mockStory.id), mockStory);
-            } catch (err) {
-              console.warn("Could not seed mock story to Firestore:", err);
-            }
-          });
-
-          const customPendingStories = localStories.filter(s => {
-            const sId = s?.id || "";
-            return typeof sId === "string" && sId.startsWith("story-");
-          });
-          const sorted = [...customPendingStories, ...DEFAULT_MOCK_STORIES];
-          setActiveStories(sorted);
-          localStorage.setItem("global_passages_v3_stories", JSON.stringify(sorted));
-        } else {
-          // Merge custom pending local stories that are not present in Firestore
-          const firestoreIds = new Set(firestoreStories.map(s => s.id));
-          const customPendingStories = localStories.filter(s => {
-            const sId = s?.id || "";
-            return typeof sId === "string" && sId.startsWith("story-") && !firestoreIds.has(sId);
-          });
-          const mergedList = [...customPendingStories, ...firestoreStories];
-
-          mergedList.sort((a, b) => {
-            const aId = a?.id || "";
-            const bId = b?.id || "";
-            const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
-            const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
-            if (aIsCustom && bIsCustom) {
-              const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
-              const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
-              return bTime - aTime;
-            }
-            if (aIsCustom) return -1;
-            if (bIsCustom) return 1;
-            return aId.localeCompare(bId);
-          });
-          setActiveStories(mergedList);
-          localStorage.setItem("global_passages_v3_stories", JSON.stringify(mergedList));
-        }
-      }, (error) => {
-        console.warn("Firestore real-time sync failed, falling back to local memory storage:", error);
-        let fallbackStories: SuccessStory[] = [];
-        const stored = localStorage.getItem("global_passages_v3_stories");
-        if (stored) {
-          try {
-            fallbackStories = JSON.parse(stored) as SuccessStory[];
-          } catch (e) {
-            fallbackStories = [...DEFAULT_MOCK_STORIES];
-          }
-        } else {
-          fallbackStories = [...DEFAULT_MOCK_STORIES];
-        }
-
-        fallbackStories.sort((a, b) => {
-          const aId = a?.id || "";
-          const bId = b?.id || "";
-          const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
-          const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
-          if (aIsCustom && bIsCustom) {
-            const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
-            const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
-            return bTime - aTime;
-          }
-          if (aIsCustom) return -1;
-          if (bIsCustom) return 1;
-          return aId.localeCompare(bId);
-        });
-
-        setActiveStories(fallbackStories);
-        
-        try {
-          handleFirestoreError(error, OperationType.GET, "success_stories");
-        } catch (diagErr) {
-          console.error("Firestore real-time subscription error: ", diagErr);
-        }
-      });
     } else {
       handleLocalUpdate();
     }
