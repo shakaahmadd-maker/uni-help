@@ -14,7 +14,7 @@ dotenv.config();
 
 const app = express();
 // Default internal port 3000 (isolated inside container network)
-const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
 // Security headers
