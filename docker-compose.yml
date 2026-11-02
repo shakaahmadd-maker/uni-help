@@ -19,24 +19,24 @@ services:
 
   backend:
     build:
-      context: ./server
+      context: ./backend
       dockerfile: Dockerfile
     container_name: unihelp_backend
     restart: always
     environment:
       NODE_ENV: production
-      PORT: 4000
+      PORT: 3000
       DATABASE_URL: postgresql://uni_help_user:${DB_PASSWORD:-unihelp_secure_pass_2026}@postgres:5432/uni_help
       JWT_SECRET: ${JWT_SECRET:-change_this_to_a_long_random_jwt_secret_in_prod}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://unihelpconsultants.com}
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - unihelp_net
     ports:
-      # Internal port 4000 avoids conflicting with host port 3001
-      - "4000:4000"
+      # Internal port 3000 for Node.js API (Traefik routes api.unihelpconsultants.com here)
+      - "3000:3000"
 
   frontend:
     build:

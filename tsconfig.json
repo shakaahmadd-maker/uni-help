@@ -30,6 +30,7 @@
   ],
   "exclude": [
     "server",
+    "backend",
     "node_modules",
     "dist"
   ]
