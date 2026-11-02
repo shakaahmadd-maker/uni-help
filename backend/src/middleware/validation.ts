@@ -10,7 +10,7 @@ export function validateBody(schema: ZodSchema) {
         error: {
           code: "VALIDATION_ERROR",
           message: "Request validation failed",
-          details: result.error.errors.map((e) => ({
+          details: result.error.errors.map((e: any) => ({
             field: e.path.join("."),
             message: e.message,
           })),
