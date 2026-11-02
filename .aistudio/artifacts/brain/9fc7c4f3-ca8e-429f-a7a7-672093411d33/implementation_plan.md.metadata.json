@@ -1,0 +1,6 @@
+{
+  "summary":  "Detailed resolution plan to fix the Dokploy backend deployment error: Dokploy is executing the root frontend Nginx Dockerfile instead of the backend Node.js Dockerfile, causing the build to fail when searching for nginx.conf.",
+  "updatedAt":  "2026-11-02T10:16:27.477152436Z",
+  "requestFeedback":  true,
+  "userFacing":  true
+}
