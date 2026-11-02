@@ -1,4 +1,5 @@
 # Multi-stage Dockerfile for Uni Help Backend Node.js API
+# Build Context: backend
 FROM node:22-alpine AS builder
 
 WORKDIR /app
@@ -6,11 +7,18 @@ WORKDIR /app
 # Copy dependency specifications and Prisma schema
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
+
+# Install all dependencies including devDependencies for build
 RUN npm ci
 
-# Copy application source code and compile TypeScript
-COPY . .
+# Copy application TypeScript source files
+COPY tsconfig.json ./
+COPY src ./src/
+
+# Generate Prisma Client for PostgreSQL
 RUN npx prisma generate
+
+# Compile TypeScript to JavaScript (dist/index.js)
 RUN npm run build
 
 # Stage 2: Production Lean Runtime
@@ -27,10 +35,10 @@ COPY prisma ./prisma/
 RUN npm ci --omit=dev
 RUN npx prisma generate
 
-# Copy compiled JavaScript output
+# Copy compiled JavaScript output from builder stage
 COPY --from=builder /app/dist ./dist
 
-# Non-root user for enhanced security
+# Non-root user for security
 USER node
 
 EXPOSE 3000
