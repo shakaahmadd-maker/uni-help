@@ -13,7 +13,9 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "migrate:firebase:dry": "tsx scripts/migrate-firebase.ts --dry-run",
-    "migrate:firebase": "tsx scripts/migrate-firebase.ts"
+    "migrate:firebase": "tsx scripts/migrate-firebase.ts",
+    "sync:firebase:live": "tsx scripts/sync-firebase-live.ts",
+    "sync:firebase:dry": "tsx scripts/sync-firebase-live.ts --dry-run"
   },
   "dependencies": {
     "@prisma/client": "^6.4.1",

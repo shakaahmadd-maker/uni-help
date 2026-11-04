@@ -149,6 +149,58 @@ async function migrateStories() {
   console.log(`[Stories] Finished: ${imported} imported, ${skipped} skipped.`);
 }
 
+async function migrateAdmins() {
+  const filePath = path.resolve(process.cwd(), "data-exports/admins.json");
+  if (!fs.existsSync(filePath)) {
+    console.log(`[Admins] No data-exports/admins.json found. Skipping.`);
+    return;
+  }
+
+  const raw = fs.readFileSync(filePath, "utf-8");
+  const data: Array<{ email?: string; password?: string; name?: string; role?: string }> = JSON.parse(raw);
+  console.log(`[Admins] Found ${data.length} records to process (Dry-run: ${isDryRun}).`);
+
+  let imported = 0;
+  let skipped = 0;
+
+  for (const item of data) {
+    if (!item.email) continue;
+    const email = item.email.toLowerCase().trim();
+
+    const existing = await prisma.user.findUnique({
+      where: { email },
+    });
+    if (existing) {
+      skipped++;
+      continue;
+    }
+
+    let role = Role.ADMISSIONS_COACH;
+    if (item.role?.toUpperCase().includes("SUPER")) role = Role.SUPER_ADMIN;
+    else if (item.role?.toUpperCase().includes("VISA")) role = Role.VISA_SPECIALIST;
+    else if (item.role?.toUpperCase().includes("OPERATIONS")) role = Role.OPERATIONS_LEAD;
+    else if (item.role?.toUpperCase().includes("COUNSELOR")) role = Role.COUNSELOR;
+
+    const rawPassword = item.password || "admin123";
+    const passwordHash = await bcrypt.hash(rawPassword, 10);
+
+    if (!isDryRun) {
+      await prisma.user.create({
+        data: {
+          email,
+          passwordHash,
+          name: item.name || email.split("@")[0],
+          role,
+          isActive: true,
+        },
+      });
+    }
+    imported++;
+  }
+
+  console.log(`[Admins] Finished: ${imported} imported, ${skipped} skipped.`);
+}
+
 async function run() {
   console.log("=== Uni Help Firebase to PostgreSQL Migration Runner ===");
   if (isDryRun) {
@@ -156,6 +208,7 @@ async function run() {
   }
   await migrateSubmissions();
   await migrateStories();
+  await migrateAdmins();
   console.log("=== Migration Complete ===");
 }
 
