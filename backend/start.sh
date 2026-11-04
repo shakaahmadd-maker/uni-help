@@ -1,16 +1,14 @@
 #!/bin/sh
 set -e
 
-echo "[Uni Help Backend] Running production startup sequence..."
+# Run Prisma database migrations if DATABASE_URL is available
+if [ -n "$DATABASE_URL" ]; then
+  echo "[Uni Help Backend] Deploying database migrations to PostgreSQL..."
+  npx prisma migrate deploy
+else
+  echo "[Uni Help Backend] DATABASE_URL not set; skipping database migrations."
+fi
 
-# 1. Generate Prisma Client
-echo "[Uni Help Backend] Step 1/3: npx prisma generate"
-npx prisma generate
-
-# 2. Deploy database migrations to PostgreSQL
-echo "[Uni Help Backend] Step 2/3: npx prisma migrate deploy"
-npx prisma migrate deploy
-
-# 3. Start Node.js API server
-echo "[Uni Help Backend] Step 3/3: npm start"
+# Start Node.js API server in the foreground
+echo "[Uni Help Backend] Starting API server..."
 exec npm start

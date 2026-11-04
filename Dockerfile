@@ -28,7 +28,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Install production dependencies (includes prisma for runtime migrations)
+# Install production dependencies only (includes prisma CLI for runtime migrations)
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
 COPY start.sh ./start.sh
@@ -36,17 +36,25 @@ COPY entrypoint.sh ./entrypoint.sh
 
 RUN npm ci --omit=dev
 RUN npx prisma generate
-RUN chmod +x ./start.sh ./entrypoint.sh
+
+# Sanitize Unix LF line endings and ensure executable permissions
+RUN tr -d '\r' < ./start.sh > ./start.sh.tmp && mv ./start.sh.tmp ./start.sh && chmod +x ./start.sh
+RUN tr -d '\r' < ./entrypoint.sh > ./entrypoint.sh.tmp && mv ./entrypoint.sh.tmp ./entrypoint.sh && chmod +x ./entrypoint.sh
 
 # Copy compiled JavaScript output from builder stage
 COPY --from=builder /app/dist ./dist
+
+# Ensure node user owns the application files
+RUN chown -R node:node /app
 
 # Non-root user for security
 USER node
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+# 15s start-period ensures container has time to deploy migrations before health check begins
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["./start.sh"]
+ENTRYPOINT ["./entrypoint.sh"]
+CMD ["npm", "start"]
