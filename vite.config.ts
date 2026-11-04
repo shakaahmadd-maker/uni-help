@@ -24,9 +24,15 @@ export default defineConfig(() => {
       },
     },
     server: {
+      host: true,
+      allowedHosts: ['unihelpconsultants.com', '.unihelpconsultants.com'],
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+    },
+    preview: {
+      host: true,
+      allowedHosts: ['unihelpconsultants.com', '.unihelpconsultants.com'],
     },
   };
 });
