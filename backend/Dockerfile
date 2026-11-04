@@ -29,11 +29,15 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# Install production dependencies only
+# Install production dependencies (includes prisma for runtime migrations)
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
+COPY start.sh ./start.sh
+COPY entrypoint.sh ./entrypoint.sh
+
 RUN npm ci --omit=dev
 RUN npx prisma generate
+RUN chmod +x ./start.sh ./entrypoint.sh
 
 # Copy compiled JavaScript output from builder stage
 COPY --from=builder /app/dist ./dist
@@ -46,4 +50,4 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
 
-CMD ["npm", "start"]
+CMD ["./start.sh"]
