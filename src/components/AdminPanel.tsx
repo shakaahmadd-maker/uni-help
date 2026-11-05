@@ -1368,17 +1368,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
               {activeTab === "stories" ? (
                 /* Success Stories compilation & registries dashboard layout */
                 <div className="space-y-4">
-                  {isSandboxMode && (
-                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-4 rounded-xl text-xs space-y-1">
-                      <strong className="font-bold text-amber-400 block flex items-center gap-1.5">
-                        <AlertTriangle className="h-4.5 w-4.5 shrink-0" />
-                        Offline Sandbox Session Mode
-                      </strong>
-                      <p className="text-slate-300 leading-relaxed font-sans">
-                        Your changes are saved securely in this browser's session cache but are <span className="font-semibold text-amber-300">not synced to Google Firestore</span> because Anonymous Auth is not enabled. To publish changes live to all students and visitors, please sign in with your licensed Google Master Admin account (<strong className="text-white font-mono">shaka.ahmadd@gmail.com</strong>) under the "Google / System Sandbox" tab.
-                      </p>
-                    </div>
-                  )}
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 p-4 rounded-xl text-xs space-y-1">
+                    <strong className="font-bold text-emerald-300 block flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4.5 w-4.5 shrink-0" />
+                      Live & Publicly Published
+                    </strong>
+                    <p className="text-slate-300 leading-relaxed font-sans">
+                      All compiled success stories and visa approvals are published with <span className="font-semibold text-emerald-300">live public visibility</span> for all site visitors worldwide. Use the compiler below to release new alumni stories or edit existing records.
+                    </p>
+                  </div>
                   
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                   

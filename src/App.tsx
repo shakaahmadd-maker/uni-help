@@ -154,7 +154,7 @@ export default function App() {
 
   // Track screen scrolling to automatically highlight active navigation anchors
   useEffect(() => {
-    const sectionIds = ["home", "about", "services", "destinations", "universities", "locations", "testimonials", "contact"];
+    const sectionIds = ["home", "about", "services", "destinations", "universities", "success-stories", "locations", "testimonials", "contact"];
     
     const handleViewportScroll = () => {
       if (window.location.pathname !== "/") return;

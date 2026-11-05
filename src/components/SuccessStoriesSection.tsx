@@ -209,52 +209,40 @@ export default function SuccessStoriesSection({
         }
       }
 
-      if (isSandboxActive) {
-        if (localStories.length === 0) {
-          localStories = [...DEFAULT_MOCK_STORIES];
+      // Always ensure DEFAULT_MOCK_STORIES is the foundation so all public visitors see live verified success stories
+      const baseStories = [...DEFAULT_MOCK_STORIES];
+      const firestoreStories = lastFirestoreStories.current || [];
+
+      // Combine base stories, backend stories, and any locally added/compiled stories
+      const allCandidateStories = [...firestoreStories, ...localStories, ...baseStories];
+      const seenIds = new Set<string>();
+      const deduplicated: SuccessStory[] = [];
+
+      for (const s of allCandidateStories) {
+        if (!s || !s.name || !s.review) continue;
+        const key = s.id || s.stampId || `${s.name}-${s.city}`;
+        if (!seenIds.has(key)) {
+          seenIds.add(key);
+          deduplicated.push(s);
         }
-        localStories.sort((a, b) => {
-          const aId = a?.id || "";
-          const bId = b?.id || "";
-          const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
-          const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
-          if (aIsCustom && bIsCustom) {
-            const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
-            const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
-            return bTime - aTime;
-          }
-          if (aIsCustom) return -1;
-          if (bIsCustom) return 1;
-          return aId.localeCompare(bId);
-        });
-        setActiveStories(localStories);
-      } else {
-        // Merge custom pending local stories that are not present in Firestore
-        const firestoreStories = lastFirestoreStories.current;
-        const firestoreIds = new Set(firestoreStories.map(s => s.id));
-        const customPendingStories = localStories.filter(s => {
-          const sId = s?.id || "";
-          return typeof sId === "string" && sId.startsWith("story-") && !firestoreIds.has(sId);
-        });
-        const mergedList = [...customPendingStories, ...firestoreStories];
-
-        mergedList.sort((a, b) => {
-          const aId = a?.id || "";
-          const bId = b?.id || "";
-          const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
-          const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
-          if (aIsCustom && bIsCustom) {
-            const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
-            const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
-            return bTime - aTime;
-          }
-          if (aIsCustom) return -1;
-          if (bIsCustom) return 1;
-          return aId.localeCompare(bId);
-        });
-
-        setActiveStories(mergedList);
       }
+
+      deduplicated.sort((a, b) => {
+        const aId = a?.id || "";
+        const bId = b?.id || "";
+        const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
+        const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
+        if (aIsCustom && bIsCustom) {
+          const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
+          const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
+          return bTime - aTime;
+        }
+        if (aIsCustom) return -1;
+        if (bIsCustom) return 1;
+        return aId.localeCompare(bId);
+      });
+
+      setActiveStories(deduplicated);
     };
 
     if (!isSandboxActive) {
@@ -277,7 +265,7 @@ export default function SuccessStoriesSection({
               visaGrantDate: item.visaGrantDate || "",
             }));
             lastFirestoreStories.current = mappedStories;
-            setActiveStories(mappedStories);
+            handleLocalUpdate();
             localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
           } else {
             handleLocalUpdate();

@@ -460,10 +460,13 @@ export default function AboutSection({ onConsult }: AboutSectionProps) {
               <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/20 via-transparent to-transparent pointer-events-none z-10" />
               
               <img 
-                src="https://firebasestorage.googleapis.com/v0/b/eduwrites-b3174.firebasestorage.app/o/about.me%20image.webp?alt=media&token=80c2fe6c-1cb1-4985-bb9c-d15c8a3aec1e" 
-                alt="About Us Banner - Premium study guidance" 
+                src="/src/assets/images/about_us_counseling_team_1793878050703.jpg" 
+                alt="Uni Help Consultants - Professional counseling team guiding university student" 
                 className="w-full h-full object-cover object-top group-hover:scale-[1.03] transition-transform duration-700 ease-out block"
                 referrerPolicy="no-referrer"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop";
+                }}
               />
             </div>
 

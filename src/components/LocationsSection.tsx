@@ -89,7 +89,7 @@ export default function LocationsSection({ onContactCity }: LocationsSectionProp
           </div>
 
           {/* Right: Selected Office High-Fidelity Profile Drawer (5 cols) */}
-          <div className="lg:col-span-5" id="selected-office-panel">
+          <div className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start" id="selected-office-panel">
             <div className="bg-white rounded-2xl shadow-lg border border-gray-100 p-6 sm:p-8 space-y-6 text-left relative overflow-hidden">
               
               {/* Background gradient top bar */}

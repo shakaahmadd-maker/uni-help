@@ -33,6 +33,15 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   PlaneTakeoff: PlaneTakeoff
 };
 
+export const SERVICE_IMAGES: Record<string, string> = {
+  "university-admissions": "/src/assets/images/service_university_admissions_1793878050723.jpg",
+  "visa-guidance": "/src/assets/images/service_visa_guidance_1793878052708.jpg",
+  "scholarship-assistance": "/src/assets/images/service_scholarship_assistance_1793878052494.jpg",
+  "career-counseling": "/src/assets/images/service_career_counseling_1793878053988.jpg",
+  "test-prep": "/src/assets/images/service_test_prep_1793878054589.jpg",
+  "pre-departure": "/src/assets/images/service_pre_departure_1793878055021.jpg"
+};
+
 const SERVICES_KPI_DATA: Record<string, { duration: string; cost: string; experience: string; englishReq: string; badge: string; overview: string }> = {
   "university-admissions": {
     duration: "2 - 8 Weeks",
@@ -293,7 +302,7 @@ export default function ServicesSection({
               </div>
               
               {/* Right Column: Dynamic Inquiry Widget Sticky Side Card */}
-              <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
+              <div className="lg:col-span-4 lg:sticky lg:top-28 lg:self-start space-y-6">
                 
                 {/* 1. Prompt Booking Card */}
                 <div className="bg-white border-2 border-brand-blue-100 shadow-xl rounded-3xl p-6 text-left relative overflow-hidden">
@@ -685,17 +694,33 @@ export default function ServicesSection({
               <div
                 key={service.id}
                 id={`service-card-${idx}`}
-                className="group relative bg-white/95 backdrop-blur-sm rounded-3xl p-6 sm:p-8 border border-slate-200/80 shadow-sm transition-all duration-300 hover:shadow-xl hover:border-brand-blue-300 hover:-translate-y-1 flex flex-col justify-between text-left"
+                className="group relative bg-white rounded-3xl overflow-hidden border border-slate-200/80 shadow-sm transition-all duration-300 hover:shadow-xl hover:border-brand-blue-300 hover:-translate-y-1.5 flex flex-col justify-between text-left"
               >
-                {/* Micro accent top bar */}
-                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-brand-blue-600 via-brand-gold-500 to-brand-green-700 opacity-0 group-hover:opacity-100 rounded-t-3xl transition-opacity duration-300" />
-                
-                <div className="space-y-4">
-                  {/* Icon Frame */}
-                  <div className="h-12 w-12 rounded-2xl bg-brand-blue-50 text-brand-blue-600 border border-brand-blue-100 flex items-center justify-center transition-colors duration-300 group-hover:bg-brand-blue-600 group-hover:text-white">
-                    <Icon className="h-5 w-5 stroke-[1.8]" />
+                {/* Visual Image Header */}
+                <div className="relative h-44 sm:h-48 w-full overflow-hidden bg-slate-100">
+                  <img
+                    src={SERVICE_IMAGES[service.id] || ACADEMIC_COUNSELING_HEADER_IMAGE}
+                    alt={service.title}
+                    className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                    referrerPolicy="no-referrer"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = ACADEMIC_COUNSELING_HEADER_IMAGE;
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-transparent" />
+                  
+                  {/* Floating Icon Frame & Tag */}
+                  <div className="absolute bottom-3 left-4 right-4 flex items-center justify-between">
+                    <div className="h-10 w-10 rounded-xl bg-white/95 backdrop-blur-md text-brand-blue-600 shadow-md flex items-center justify-center border border-white/60">
+                      <Icon className="h-5 w-5 stroke-[2]" />
+                    </div>
+                    <span className="text-[10px] font-mono font-bold tracking-wider text-brand-gold-300 uppercase bg-slate-950/70 backdrop-blur-md px-2.5 py-1 rounded-md border border-white/10">
+                      {SERVICES_KPI_DATA[service.id]?.duration || "Guided Phase"}
+                    </span>
                   </div>
+                </div>
 
+                <div className="p-6 sm:p-7 flex-1 flex flex-col justify-between space-y-4">
                   {/* Title & Description */}
                   <div className="space-y-2">
                     <h4 className="font-display font-bold text-lg text-brand-blue-950 group-hover:text-brand-blue-600 transition-colors duration-200">
@@ -705,45 +730,45 @@ export default function ServicesSection({
                       {service.description}
                     </p>
                   </div>
-                </div>
 
-                {/* Benefits Pill Badges (First 2) */}
-                <div className="pt-4 flex flex-wrap gap-1.5 mt-3 border-t border-slate-100">
-                  {service.benefits.slice(0, 2).map((benefit, bIdx) => (
-                    <span
-                      key={bIdx}
-                      className="inline-block text-[10px] font-sans font-medium text-slate-500 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-100"
+                  {/* Benefits Pill Badges (First 2) */}
+                  <div className="pt-3 flex flex-wrap gap-1.5 border-t border-slate-100">
+                    {service.benefits.slice(0, 2).map((benefit, bIdx) => (
+                      <span
+                        key={bIdx}
+                        className="inline-block text-[10px] font-sans font-medium text-slate-600 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-150"
+                      >
+                        {benefit}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Actions Row */}
+                  <div className="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        if (onNavigate) {
+                          onNavigate(getServicePath(service.id));
+                        } else {
+                          setLocalSelectedService(service);
+                        }
+                      }}
+                      id={`service-details-btn-${service.id}`}
+                      className="text-xs font-sans font-bold text-brand-blue-600 hover:text-brand-blue-800 flex items-center gap-1 focus:outline-none cursor-pointer"
                     >
-                      {benefit}
-                    </span>
-                  ))}
-                </div>
+                      <Info className="h-3.5 w-3.5" />
+                      Read Deep Details
+                    </button>
 
-                {/* Actions Row */}
-                <div className="pt-5 mt-4 flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      if (onNavigate) {
-                        onNavigate(getServicePath(service.id));
-                      } else {
-                        setLocalSelectedService(service);
-                      }
-                    }}
-                    id={`service-details-btn-${service.id}`}
-                    className="text-xs font-sans font-semibold text-brand-blue-600 hover:text-brand-blue-800 flex items-center gap-1 focus:outline-none cursor-pointer"
-                  >
-                    <Info className="h-3.5 w-3.5" />
-                    Read Deep Details
-                  </button>
-
-                  <button
-                    onClick={() => onBookService(service.title)}
-                    id={`service-select-btn-${service.id}`}
-                    className="h-9 w-9 rounded-full bg-slate-50 text-slate-500 border border-slate-200/50 group-hover:bg-brand-gold-500 group-hover:border-transparent group-hover:text-brand-blue-950 flex items-center justify-center group-hover:shadow transition-all duration-300 transform active:scale-95 cursor-pointer"
-                    title="Select Service"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </button>
+                    <button
+                      onClick={() => onBookService(service.title)}
+                      id={`service-select-btn-${service.id}`}
+                      className="h-9 w-9 rounded-full bg-slate-50 text-slate-600 border border-slate-200/60 group-hover:bg-brand-gold-500 group-hover:border-transparent group-hover:text-brand-blue-950 flex items-center justify-center group-hover:shadow transition-all duration-300 transform active:scale-95 cursor-pointer"
+                      title="Select Service"
+                    >
+                      <ArrowRight className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
 
               </div>

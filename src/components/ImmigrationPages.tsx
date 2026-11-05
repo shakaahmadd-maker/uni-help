@@ -1382,7 +1382,7 @@ export default function ImmigrationPages({ currentPath, onNavigate, onConsult }:
               </div>
               
               {/* Right Column: Dynamic Inquiry Widget Sticky Side Card */}
-              <div className="lg:col-span-4 lg:sticky lg:top-24 space-y-6">
+              <div className="lg:col-span-4 lg:sticky lg:top-28 lg:self-start space-y-6">
                 
                 {/* 1. Prompt Booking & Prefill Callout Card */}
                 <div className="bg-white border-2 border-brand-blue-100 shadow-xl rounded-3xl p-6 text-left relative overflow-hidden">

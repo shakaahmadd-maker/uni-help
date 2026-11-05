@@ -140,19 +140,21 @@ export default function Footer({ onLinkClick, onCityLinkClick, currentPath, navi
           
           {/* Brand Col (3 Columns) */}
           <div className="md:col-span-6 lg:col-span-3 space-y-5" id="footer-about-col">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-brand-gold-500 text-brand-blue-950">
-                <LogoIcon className="h-6 w-6 stroke-[2]" />
+            <a 
+              href="/" 
+              onClick={(e) => { e.preventDefault(); navigateTo("/"); }} 
+              className="inline-block group focus:outline-none"
+              title="Uni Help Consultants"
+            >
+              <div className="bg-white rounded-2xl px-4 py-2.5 inline-flex items-center justify-center shadow-lg shadow-black/20 border border-white/10 transition-transform duration-300 group-hover:scale-102">
+                <img
+                  src="/logo.png"
+                  alt="Uni Help Consultants Logo"
+                  className="h-9 sm:h-10 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
               </div>
-              <div>
-                <span className="font-display font-black text-sm leading-none tracking-tight">
-                  UNI HELP <span className="text-brand-gold-400 font-extrabold ml-0.5 block mt-1">CONSULTANTS</span>
-                </span>
-                <p className="text-[9px] font-sans text-brand-blue-100/70 tracking-widest uppercase mt-0.5">
-                  Your Bridge to Global Education
-                </p>
-              </div>
-            </div>
+            </a>
 
             <p className="font-sans text-[11px] text-brand-blue-200/80 leading-relaxed max-w-sm">
               Helping Pakistani and Gulf students fulfill international university placement pathways seamlessly. Certified in-person operations spanning Lahore, Karachi, Islamabad, Dubai, Riyadh, and Doha.

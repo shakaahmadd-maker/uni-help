@@ -420,7 +420,7 @@ export default function ScholarshipDetailPage({
           </div>
 
           {/* Right sidebar block - 4 cols */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="lg:col-span-4 lg:sticky lg:top-28 lg:self-start space-y-6">
             
             {/* Direct Booking/Inquiry Card */}
             <div className="bg-white border-2 border-brand-blue-100 shadow-xl rounded-3xl p-6 text-left relative overflow-hidden">
