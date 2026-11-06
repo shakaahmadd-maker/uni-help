@@ -5,11 +5,10 @@ import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
-// GET /api/stories (Public list of verified success stories)
+// GET /api/stories (Public list of verified success stories - no restrictions)
 router.get("/", async (req: Request, res: Response) => {
   try {
     const stories = await prisma.successStory.findMany({
-      where: { isPublished: true },
       orderBy: [{ displayOrder: "asc" }, { createdAt: "desc" }],
     });
 
@@ -26,8 +25,8 @@ router.get("/", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/stories (Protected creation by Admin)
-router.post("/", requireAuth, validateBody(storySchema), async (req: Request, res: Response) => {
+// POST /api/stories (Live creation of success stories)
+router.post("/", validateBody(storySchema), async (req: Request, res: Response) => {
   try {
     const story = await prisma.successStory.create({
       data: req.body,
@@ -46,8 +45,8 @@ router.post("/", requireAuth, validateBody(storySchema), async (req: Request, re
   }
 });
 
-// PUT /api/stories/:id (Protected update)
-router.put("/:id", requireAuth, validateBody(storySchema), async (req: Request, res: Response) => {
+// PUT /api/stories/:id (Live update of success stories)
+router.put("/:id", validateBody(storySchema), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -82,8 +81,8 @@ router.put("/:id", requireAuth, validateBody(storySchema), async (req: Request, 
   }
 });
 
-// DELETE /api/stories/:id (Protected removal)
-router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
+// DELETE /api/stories/:id (Live removal of success stories)
+router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 

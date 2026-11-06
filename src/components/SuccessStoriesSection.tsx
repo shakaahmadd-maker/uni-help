@@ -149,29 +149,6 @@ export default function SuccessStoriesSection({
   const [direction, setDirection] = useState(1); // 1 = next (right to left), -1 = prev (left to right)
   const [autoplay, setAutoplay] = useState(true);
 
-  const [isSandboxActive, setIsSandboxActive] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("unihelp_is_sandbox_mode") === "true";
-    }
-    return false;
-  });
-
-  // Automatically update the sandbox mode status reactively on storage or local events
-  useEffect(() => {
-    const checkSandboxMode = () => {
-      const active = localStorage.getItem("unihelp_is_sandbox_mode") === "true";
-      setIsSandboxActive(active);
-    };
-    window.addEventListener("storage", checkSandboxMode);
-    window.addEventListener("localStoriesUpdated", checkSandboxMode);
-    window.addEventListener("unihelp_is_sandbox_mode_changed", checkSandboxMode);
-    return () => {
-      window.removeEventListener("storage", checkSandboxMode);
-      window.removeEventListener("localStoriesUpdated", checkSandboxMode);
-      window.removeEventListener("unihelp_is_sandbox_mode_changed", checkSandboxMode);
-    };
-  }, []);
-
   // Detail Modal
   const [selectedVisaStory, setSelectedVisaStory] = useState<SuccessStory | null>(null);
 
@@ -191,14 +168,17 @@ export default function SuccessStoriesSection({
     }, 4000);
   };
 
-  const lastFirestoreStories = useRef<SuccessStory[]>([]);
+  const lastBackendStories = useRef<SuccessStory[]>([]);
 
-  // Live real-time client-side storage & cloud persistence sync
+  // Live real-time entries sync without Firestore: backend API + multi-tab BroadcastChannel + storage sync
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
+    // BroadcastChannel enables instant cross-tab and cross-window sync across all visitor sessions in the browser
+    const storiesChannel = typeof window !== "undefined" && "BroadcastChannel" in window
+      ? new BroadcastChannel("unihelp_stories_channel")
+      : null;
 
     const handleLocalUpdate = () => {
-      // Load current local stories first to find any offline custom stories
+      // Load current local stories first to find any active custom stories
       let localStories: SuccessStory[] = [];
       const stored = localStorage.getItem("global_passages_v3_stories");
       if (stored) {
@@ -209,12 +189,12 @@ export default function SuccessStoriesSection({
         }
       }
 
-      // Always ensure DEFAULT_MOCK_STORIES is the foundation so all public visitors see live verified success stories
+      // Foundational verified stories baseline
       const baseStories = [...DEFAULT_MOCK_STORIES];
-      const firestoreStories = lastFirestoreStories.current || [];
+      const backendStories = lastBackendStories.current || [];
 
-      // Combine base stories, backend stories, and any locally added/compiled stories
-      const allCandidateStories = [...firestoreStories, ...localStories, ...baseStories];
+      // Combine backend stories, local stories, and default stories
+      const allCandidateStories = [...backendStories, ...localStories, ...baseStories];
       const seenIds = new Set<string>();
       const deduplicated: SuccessStory[] = [];
 
@@ -245,52 +225,63 @@ export default function SuccessStoriesSection({
       setActiveStories(deduplicated);
     };
 
-    if (!isSandboxActive) {
-      // Fetch verified success stories from PostgreSQL backend API
-      storiesApi
-        .getAll()
-        .then((backendStories) => {
-          if (backendStories && backendStories.length > 0) {
-            const mappedStories: SuccessStory[] = backendStories.map((item) => ({
-              id: item.legacyId || item.id,
-              name: item.name,
-              city: item.city,
-              stream: item.stream,
-              review: item.review,
-              rating: item.rating,
-              clientPic: item.clientPic || "",
-              visaStamp: item.visaStamp || "",
-              maskedName: item.maskedName || "A*** S***",
-              stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
-              visaGrantDate: item.visaGrantDate || "",
-            }));
-            lastFirestoreStories.current = mappedStories;
-            handleLocalUpdate();
-            localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
-          } else {
-            handleLocalUpdate();
-          }
-        })
-        .catch((err) => {
-          console.warn("Backend API stories fetch offline or loading, using local cache:", err);
+    // 1. Initial local load
+    handleLocalUpdate();
+
+    // 2. Fetch live entries from backend API unconditionally (public endpoint)
+    storiesApi
+      .getAll()
+      .then((backendStories) => {
+        if (backendStories && backendStories.length > 0) {
+          const mappedStories: SuccessStory[] = backendStories.map((item) => ({
+            id: item.legacyId || item.id,
+            name: item.name,
+            city: item.city,
+            stream: item.stream,
+            review: item.review,
+            rating: item.rating,
+            clientPic: item.clientPic || "",
+            visaStamp: item.visaStamp || "",
+            maskedName: item.maskedName || "A*** S***",
+            stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
+            visaGrantDate: item.visaGrantDate || "",
+          }));
+          lastBackendStories.current = mappedStories;
           handleLocalUpdate();
-        });
-    } else {
-      handleLocalUpdate();
+          localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
+        } else {
+          handleLocalUpdate();
+        }
+      })
+      .catch((_err) => {
+        // Backend API offline or local preview, continue cleanly with local persistence
+        handleLocalUpdate();
+      });
+
+    // 3. Listen for BroadcastChannel updates from admin panel or other tabs
+    if (storiesChannel) {
+      storiesChannel.onmessage = (event) => {
+        if (event.data?.type === "STORIES_UPDATED") {
+          if (event.data?.stories && Array.isArray(event.data.stories)) {
+            lastBackendStories.current = event.data.stories;
+          }
+          handleLocalUpdate();
+        }
+      };
     }
 
-    // Register listeners for real-time local storage updates so edits/creates display instantly
+    // 4. Register listeners for real-time local storage & custom browser events
     window.addEventListener("storage", handleLocalUpdate);
     window.addEventListener("localStoriesUpdated", handleLocalUpdate);
 
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
+      if (storiesChannel) {
+        storiesChannel.close();
       }
       window.removeEventListener("storage", handleLocalUpdate);
       window.removeEventListener("localStoriesUpdated", handleLocalUpdate);
     };
-  }, [isSandboxActive]);
+  }, []);
 
   const copyShareLink = () => {
     addToast("Social sharing link copied to clipboard!", "info");

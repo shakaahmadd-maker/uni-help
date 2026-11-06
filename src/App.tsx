@@ -249,7 +249,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans text-gray-800 antialiased flex flex-col justify-between overflow-x-hidden">
+    <div className="min-h-screen bg-white font-sans text-gray-800 antialiased flex flex-col justify-between overflow-x-clip">
       
       {/* 1. Header Navigation */}
       <Header 

@@ -136,7 +136,7 @@ export default function AboutSection({ onConsult }: AboutSectionProps) {
   };
 
   return (
-    <section id="about" className="py-24 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative overflow-hidden">
+    <section id="about" className="py-24 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 relative">
       
       {/* 3D Dynamics Perspective Style Tag Injected for Perfect Aesthetic Performance */}
       <style>{`
@@ -175,10 +175,12 @@ export default function AboutSection({ onConsult }: AboutSectionProps) {
         }
       `}</style>
 
-      {/* Modern Background Decorators */}
-      <div className="absolute top-1/4 -left-64 w-[500px] h-[500px] rounded-full bg-brand-blue-600/5 blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-1/4 -right-64 w-[500px] h-[500px] rounded-full bg-brand-gold-500/5 blur-[120px] pointer-events-none" />
-      <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-45 pointer-events-none" />
+      {/* Modern Background Decorators isolated so overflow does not break position sticky */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 -left-64 w-[500px] h-[500px] rounded-full bg-brand-blue-600/5 blur-[120px] pointer-events-none" />
+        <div className="absolute bottom-1/4 -right-64 w-[500px] h-[500px] rounded-full bg-brand-gold-500/5 blur-[120px] pointer-events-none" />
+        <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] dark:bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-45 pointer-events-none" />
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         
@@ -451,7 +453,10 @@ export default function AboutSection({ onConsult }: AboutSectionProps) {
           {/* ========================================== */}
           {/* RIGHT: HIGH-IMPACT STICKY VISUAL BANNER     */}
           {/* ========================================== */}
-          <div className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start space-y-6">
+          <div 
+            className="lg:col-span-5 lg:sticky lg:top-28 lg:self-start space-y-6"
+            style={{ position: "sticky", top: "7rem" }}
+          >
             
             {/* Main Redesigned Banner - NO Overlays for Clean Elegance */}
             <div className="relative rounded-3xl overflow-hidden shadow-2xl group border-4 border-white dark:border-slate-900 bg-slate-100 dark:bg-slate-900 aspect-[4/5] lg:aspect-auto lg:h-[580px]">

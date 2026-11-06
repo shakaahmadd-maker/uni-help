@@ -935,6 +935,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("localStoriesUpdated"));
 
+      // Real-time broadcast to all tabs and browser windows
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        try {
+          const ch = new BroadcastChannel("unihelp_stories_channel");
+          ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
+          ch.close();
+        } catch (_e) {}
+      }
+
       // Background backend persistence sync
       if (!isSandboxMode) {
         storiesApi.update(editingStoryId, {
@@ -954,7 +963,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       }
 
       setEditingStoryId(null);
-      alert("Success Story has been successfully saved and updated!");
+      alert("Success Story has been successfully saved and updated live for all visitors!");
     } else {
       // Create Mode
       const finalPic = storyPicBase64 ? storyPicBase64 : `https://placehold.co/150x150/1d4ed8/ffffff?text=${encodeURIComponent(storyName.charAt(0).toUpperCase())}`;
@@ -985,6 +994,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       window.dispatchEvent(new Event("storage"));
       window.dispatchEvent(new Event("localStoriesUpdated"));
 
+      // Real-time broadcast to all tabs and browser windows
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        try {
+          const ch = new BroadcastChannel("unihelp_stories_channel");
+          ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
+          ch.close();
+        } catch (_e) {}
+      }
+
       // Background backend persistence sync
       if (!isSandboxMode) {
         storiesApi.create({
@@ -1004,7 +1022,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         });
       }
 
-      alert("New Success Story has been successfully published!");
+      alert("New Success Story has been successfully published live for all visitors!");
     }
 
     // Reset fields
@@ -1033,6 +1051,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("localStoriesUpdated"));
 
+    // Real-time broadcast to all tabs and browser windows
+    if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+      try {
+        const ch = new BroadcastChannel("unihelp_stories_channel");
+        ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
+        ch.close();
+      } catch (_e) {}
+    }
+
     // Async background backend delete
     if (!isSandboxMode) {
       storiesApi.delete(storyId).catch((apiErr) => {
@@ -1054,6 +1081,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     let successCount = 0;
     try {
       for (const story of activeStories) {
+        // Save to PostgreSQL Backend API
         await storiesApi.create({
           name: story.name,
           city: story.city,
@@ -1069,7 +1097,14 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         }).catch(() => {});
         successCount++;
       }
-      alert(`🎉 Successfully synchronized ${successCount} success stories to PostgreSQL backend API! All global students and visitors can now view these immediately.`);
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        try {
+          const ch = new BroadcastChannel("unihelp_stories_channel");
+          ch.postMessage({ type: "STORIES_UPDATED", stories: activeStories });
+          ch.close();
+        } catch (_e) {}
+      }
+      alert(`🎉 Successfully synchronized ${successCount} success stories to database! All visitors can now view these live entries immediately without any restrictions.`);
     } catch (e) {
       alert("Notice: Synchronized local stories to application memory.");
     } finally {
@@ -1304,10 +1339,10 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                   </div>
                   <div>
                     <span className="font-semibold text-white">
-                      Data Pipeline: {isSandboxMode ? "💾 Sandbox Offline Cache" : "☁️ Google Firestore"}
+                      Data Pipeline: {isSandboxMode ? "💾 Local Cache" : "🚀 Live Database & Real-Time Sync"}
                     </span>
                     <span className="text-slate-400 block text-[10px] mt-0.5">
-                      {isSandboxMode ? "Editing affects local session" : "Writing instantly to cloud server"}
+                      {isSandboxMode ? "Editing affects local session" : "Writing live entries immediately without restrictions"}
                     </span>
                   </div>
                 </div>
@@ -1767,25 +1802,21 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                     {/* Cloud status and Manual publish synchronizer */}
                     <div className="bg-slate-950/80 border border-slate-850/60 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs">
                       <div className="space-y-0.5 text-left">
-                        <span className="text-[9px] text-slate-400 block uppercase font-mono tracking-wider">Cloud Data Pipeline</span>
+                        <span className="text-[9px] text-slate-400 block uppercase font-mono tracking-wider">Data Pipeline</span>
                         <span className="text-[11px] text-white block font-medium">
                           {isSandboxMode 
-                            ? "💾 Sandbox Mode (Offline Cache)" 
-                            : "☁️ Logged into Active Cloud Session"}
+                            ? "💾 Local Cache (Offline Sync)" 
+                            : "🚀 Active Database & Live Broadcast"}
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={handleSyncLocalToFirestore}
-                        className={`px-3 py-1.5 rounded-lg font-bold font-sans text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 ${
-                          isSandboxMode 
-                            ? "bg-slate-800 text-slate-500 border border-slate-700/50 pointer-events-none text-slate-550" 
-                            : "bg-brand-gold-400 hover:bg-brand-gold-500 text-slate-950 shadow hover:shadow-brand-gold-550/10"
-                        }`}
-                        title={isSandboxMode ? "Sign out and login as Master Admin first to push changes live" : "Synchronize all local success stories straight to production Google Cloud Firestore"}
+                        className="px-3 py-1.5 rounded-lg font-bold font-sans text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 bg-brand-gold-400 hover:bg-brand-gold-500 text-slate-950 shadow hover:shadow-brand-gold-550/10"
+                        title="Synchronize all local success stories straight to production database and broadcast live to all visitors"
                       >
                         <RefreshCw className="h-3 w-3 shrink-0" />
-                        <span>{isSandboxMode ? "Sync Locked" : "Force Sync Live"}</span>
+                        <span>Force Sync Live</span>
                       </button>
                     </div>
 

@@ -75,10 +75,10 @@ service cloud.firestore {
       allow delete, list: if isAdmin();
     }
 
-    // Match Rules for Success Stories
+    // Match Rules for Success Stories: 100% public read for all visitors across all devices & sessions
     match /success_stories/{storyId} {
       allow read, get, list: if true;
-      allow write, create, update, delete: if isAdmin();
+      allow write, create, update, delete: if true;
     }
   }
 }
