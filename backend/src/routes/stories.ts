@@ -1,22 +1,11 @@
 import { Router, Request, Response } from "express";
-import pg from "pg";
+import { prisma } from "../db.js";
 import path from "path";
 import fs from "fs";
 
-const { Pool } = pg;
 const router = Router();
 
-// Connect to Dokploy PostgreSQL database using DATABASE_URL environment variable
-const pool = process.env.DATABASE_URL
-  ? new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: process.env.DATABASE_URL?.includes("localhost") || process.env.DATABASE_URL?.includes("127.0.0.1")
-        ? false
-        : { rejectUnauthorized: false },
-    })
-  : null;
-
-// Graceful fallback for local development or before DATABASE_URL is mapped
+// Fallback file storage helper for local/offline resilience
 const DATA_DIR = path.join(process.cwd(), "data");
 const STORIES_FILE = path.join(DATA_DIR, "stories.json");
 
@@ -36,233 +25,261 @@ function writeFallbackStories(stories: any[]): void {
     fs.writeFileSync(temp, JSON.stringify(stories, null, 2), "utf-8");
     fs.renameSync(temp, STORIES_FILE);
   } catch (err) {
-    console.error("[Storage] Fallback file write failed:", err);
+    console.error("[Storage] Fallback write error:", err);
   }
 }
 
-// Automatically create table if it does not exist
-let tableInitialized = false;
-async function ensureTable() {
-  if (!pool || tableInitialized) return;
-  try {
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS success_stories (
-          id VARCHAR(255) PRIMARY KEY,
-          legacy_id VARCHAR(255),
-          name VARCHAR(255) NOT NULL,
-          city VARCHAR(255),
-          stream VARCHAR(255),
-          review TEXT,
-          rating INTEGER DEFAULT 5,
-          client_pic TEXT,
-          visa_stamp TEXT,
-          masked_name VARCHAR(255),
-          stamp_id VARCHAR(100),
-          visa_grant_date VARCHAR(100),
-          is_published BOOLEAN DEFAULT TRUE,
-          created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-          updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-      );
-    `);
-    tableInitialized = true;
-    console.log("[Dokploy PostgreSQL] success_stories table verified/created successfully.");
-  } catch (err: any) {
-    console.warn("[Dokploy PostgreSQL] Table verification note:", err.message);
-  }
-}
-
-// GET /api/stories - Fetch all success stories from PostgreSQL
+// GET /api/stories - Fetch all success stories from PostgreSQL via Prisma ORM
+// 100% Unrestricted: zero auth blockers, zero sandbox gates, public access
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    if (pool) {
-      await ensureTable();
-      const result = await pool.query(
-        `SELECT id, legacy_id as "legacyId", name, city, stream, review, rating, 
-                client_pic as "clientPic", visa_stamp as "visaStamp", masked_name as "maskedName", 
-                stamp_id as "stampId", visa_grant_date as "visaGrantDate", is_published as "isPublished", 
-                created_at as "createdAt", updated_at as "updatedAt" 
-         FROM success_stories 
-         ORDER BY created_at DESC`
-      );
-      return res.json({ success: true, data: result.rows });
-    } else {
-      const fallback = readFallbackStories();
-      return res.json({ success: true, data: fallback });
-    }
+    const stories = await prisma.successStory.findMany({
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json({
+      success: true,
+      data: stories,
+    });
   } catch (error: any) {
-    console.error("[Database Error] Failed to fetch stories from PostgreSQL, using fallback:", error.message);
+    console.warn("[Prisma Stories] Database query failed, using fallback storage:", error.message);
     const fallback = readFallbackStories();
-    return res.json({ success: true, data: fallback });
+    return res.json({
+      success: true,
+      data: fallback,
+    });
   }
 });
 
-// POST /api/stories - Create or update a success story in PostgreSQL
+// POST /api/stories - Create or upsert a success story via Prisma ORM
+// Supports Base64 image payloads (clientPic, visaStamp) and handles id / legacyId
 router.post("/", async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
     const targetId = body.id || `story-${Date.now()}`;
     const legacyId = body.legacyId || body.id || null;
     const name = body.name || "Anonymous Student";
+    const maskedName = body.maskedName || `${name.charAt(0)}***`;
     const city = body.city || "Global Destination";
     const stream = body.stream || "Academic Degree";
     const review = body.review || "";
     const rating = typeof body.rating === "number" ? body.rating : 5;
     const clientPic = body.clientPic || "";
     const visaStamp = body.visaStamp || "";
-    const maskedName = body.maskedName || `${name.charAt(0)}***`;
     const stampId = body.stampId || `STAMP-${Math.floor(100 + Math.random() * 900)}`;
     const visaGrantDate = body.visaGrantDate || "";
-    const isPublished = true;
-    const createdAt = body.createdAt || new Date().toISOString();
-    const updatedAt = new Date().toISOString();
+    const isPublished = body.isPublished !== undefined ? Boolean(body.isPublished) : true;
+    const displayOrder = typeof body.displayOrder === "number" ? body.displayOrder : 0;
+    const createdAt = body.createdAt ? new Date(body.createdAt) : new Date();
 
-    if (pool) {
-      await ensureTable();
-      // Upsert into PostgreSQL
-      const query = `
-        INSERT INTO success_stories 
-        (id, legacy_id, name, city, stream, review, rating, client_pic, visa_stamp, masked_name, stamp_id, visa_grant_date, is_published, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
-        ON CONFLICT (id) DO UPDATE SET
-          name = EXCLUDED.name,
-          city = EXCLUDED.city,
-          stream = EXCLUDED.stream,
-          review = EXCLUDED.review,
-          rating = EXCLUDED.rating,
-          client_pic = EXCLUDED.client_pic,
-          visa_stamp = EXCLUDED.visa_stamp,
-          masked_name = EXCLUDED.masked_name,
-          stamp_id = EXCLUDED.stamp_id,
-          visa_grant_date = EXCLUDED.visa_grant_date,
-          is_published = EXCLUDED.is_published,
-          updated_at = EXCLUDED.updated_at
-        RETURNING id, legacy_id as "legacyId", name, city, stream, review, rating, client_pic as "clientPic", visa_stamp as "visaStamp", masked_name as "maskedName", stamp_id as "stampId", visa_grant_date as "visaGrantDate", is_published as "isPublished", created_at as "createdAt", updated_at as "updatedAt";
-      `;
+    let storyRecord: any = null;
 
-      const values = [
-        targetId, legacyId, name, city, stream, review, rating, 
-        clientPic, visaStamp, maskedName, stampId, visaGrantDate, 
-        isPublished, createdAt, updatedAt
-      ];
+    try {
+      const existing = await prisma.successStory.findFirst({
+        where: {
+          OR: [
+            { id: targetId },
+            ...(legacyId ? [{ legacyId }] : []),
+          ],
+        },
+      });
 
-      const result = await pool.query(query, values);
-      
-      // Also cache to local fallback file
-      try {
-        const fileStories = readFallbackStories();
-        const idx = fileStories.findIndex((s) => s.id === targetId || (legacyId && s.id === legacyId));
-        if (idx !== -1) fileStories[idx] = result.rows[0];
-        else fileStories.unshift(result.rows[0]);
-        writeFallbackStories(fileStories);
-      } catch {}
-
-      console.log(`[Dokploy PostgreSQL] Story saved to database: "${name}" (${targetId})`);
-      return res.status(201).json({ success: true, data: result.rows[0] });
-    } else {
-      // Local fallback file storage
-      const fileStories = readFallbackStories();
-      const fallbackStory = {
+      if (existing) {
+        storyRecord = await prisma.successStory.update({
+          where: { id: existing.id },
+          data: {
+            name,
+            maskedName,
+            city,
+            stream,
+            review,
+            rating,
+            clientPic,
+            visaStamp,
+            stampId,
+            visaGrantDate,
+            isPublished,
+            displayOrder,
+          },
+        });
+      } else {
+        storyRecord = await prisma.successStory.create({
+          data: {
+            id: targetId,
+            legacyId,
+            name,
+            maskedName,
+            city,
+            stream,
+            review,
+            rating,
+            clientPic,
+            visaStamp,
+            stampId,
+            visaGrantDate,
+            isPublished,
+            displayOrder,
+            createdAt,
+          },
+        });
+      }
+    } catch (dbErr: any) {
+      console.warn("[Prisma Stories] Database write failed, falling back to JSON storage:", dbErr.message);
+      storyRecord = {
         id: targetId,
         legacyId,
         name,
+        maskedName,
         city,
         stream,
         review,
         rating,
         clientPic,
         visaStamp,
-        maskedName,
         stampId,
         visaGrantDate,
         isPublished,
-        createdAt,
-        updatedAt,
+        displayOrder,
+        createdAt: createdAt.toISOString(),
+        updatedAt: new Date().toISOString(),
       };
-      const idx = fileStories.findIndex((s) => s.id === targetId || (legacyId && s.id === legacyId));
-      if (idx !== -1) fileStories[idx] = fallbackStory;
-      else fileStories.unshift(fallbackStory);
-      writeFallbackStories(fileStories);
-
-      console.log(`[Storage] Story saved to fallback storage: "${name}" (${targetId})`);
-      return res.status(201).json({ success: true, data: fallbackStory });
     }
+
+    // Keep local fallback storage in sync
+    try {
+      const fileStories = readFallbackStories();
+      const idx = fileStories.findIndex((s) => s.id === targetId || (legacyId && s.id === legacyId));
+      if (idx !== -1) fileStories[idx] = storyRecord;
+      else fileStories.unshift(storyRecord);
+      writeFallbackStories(fileStories);
+    } catch {}
+
+    console.log(`[Prisma Stories] Story saved: "${name}" (${storyRecord.id})`);
+    return res.status(201).json({
+      success: true,
+      data: storyRecord,
+    });
   } catch (error: any) {
-    console.error("[Database Error] Failed to create story in PostgreSQL:", error.message);
-    return res.status(500).json({ success: false, error: { message: error.message } });
+    console.error("[Stories API] Story creation failed:", error);
+    return res.status(500).json({
+      success: false,
+      error: { code: "CREATE_FAILED", message: error.message || "Failed to create success story" },
+    });
   }
 });
 
-// PUT /api/stories/:id - Update existing success story in PostgreSQL
+// PUT /api/stories/:id - Update existing success story in PostgreSQL via Prisma ORM
 router.put("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const body = req.body || {};
-    const updatedAt = new Date().toISOString();
+    let updatedRecord: any = null;
 
-    if (pool) {
-      await ensureTable();
-      const query = `
-        UPDATE success_stories SET
-          name = COALESCE($1, name),
-          city = COALESCE($2, city),
-          stream = COALESCE($3, stream),
-          review = COALESCE($4, review),
-          rating = COALESCE($5, rating),
-          client_pic = COALESCE($6, client_pic),
-          visa_stamp = COALESCE($7, visa_stamp),
-          masked_name = COALESCE($8, masked_name),
-          stamp_id = COALESCE($9, stamp_id),
-          visa_grant_date = COALESCE($10, visa_grant_date),
-          updated_at = $11
-        WHERE id = $12 OR legacy_id = $12
-        RETURNING id, legacy_id as "legacyId", name, city, stream, review, rating, client_pic as "clientPic", visa_stamp as "visaStamp", masked_name as "maskedName", stamp_id as "stampId", visa_grant_date as "visaGrantDate", is_published as "isPublished", created_at as "createdAt", updated_at as "updatedAt";
-      `;
+    try {
+      const existing = await prisma.successStory.findFirst({
+        where: {
+          OR: [{ id }, { legacyId: id }],
+        },
+      });
 
-      const values = [
-        body.name, body.city, body.stream, body.review, body.rating,
-        body.clientPic, body.visaStamp, body.maskedName, body.stampId,
-        body.visaGrantDate, updatedAt, id
-      ];
-
-      const result = await pool.query(query, values);
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: { message: "Success story not found" } });
+      if (!existing) {
+        return res.status(404).json({
+          success: false,
+          error: { code: "NOT_FOUND", message: "Success story not found" },
+        });
       }
 
-      return res.json({ success: true, data: result.rows[0] });
-    } else {
+      updatedRecord = await prisma.successStory.update({
+        where: { id: existing.id },
+        data: {
+          ...(body.name !== undefined && { name: body.name }),
+          ...(body.maskedName !== undefined && { maskedName: body.maskedName }),
+          ...(body.city !== undefined && { city: body.city }),
+          ...(body.stream !== undefined && { stream: body.stream }),
+          ...(body.review !== undefined && { review: body.review }),
+          ...(body.rating !== undefined && { rating: typeof body.rating === "number" ? body.rating : 5 }),
+          ...(body.clientPic !== undefined && { clientPic: body.clientPic }),
+          ...(body.visaStamp !== undefined && { visaStamp: body.visaStamp }),
+          ...(body.stampId !== undefined && { stampId: body.stampId }),
+          ...(body.visaGrantDate !== undefined && { visaGrantDate: body.visaGrantDate }),
+          ...(body.isPublished !== undefined && { isPublished: Boolean(body.isPublished) }),
+          ...(body.displayOrder !== undefined && { displayOrder: Number(body.displayOrder) }),
+        },
+      });
+    } catch (dbErr: any) {
+      console.warn("[Prisma Stories] Database update failed, falling back to JSON storage:", dbErr.message);
       const stories = readFallbackStories();
       const idx = stories.findIndex((s) => s.id === id || s.legacyId === id);
       if (idx === -1) {
-        return res.status(404).json({ success: false, error: { message: "Success story not found" } });
+        return res.status(404).json({
+          success: false,
+          error: { code: "NOT_FOUND", message: "Success story not found" },
+        });
       }
-      stories[idx] = { ...stories[idx], ...body, updatedAt };
-      writeFallbackStories(stories);
-      return res.json({ success: true, data: stories[idx] });
+      updatedRecord = { ...stories[idx], ...body, updatedAt: new Date().toISOString() };
     }
+
+    // Keep fallback storage in sync
+    try {
+      const stories = readFallbackStories();
+      const idx = stories.findIndex((s) => s.id === id || s.legacyId === id);
+      if (idx !== -1) {
+        stories[idx] = updatedRecord;
+        writeFallbackStories(stories);
+      }
+    } catch {}
+
+    return res.json({
+      success: true,
+      data: updatedRecord,
+    });
   } catch (error: any) {
-    console.error("[Database Error] Failed to update story:", error.message);
-    return res.status(500).json({ success: false, error: { message: error.message } });
+    console.error("[Stories API] Story update failed:", error);
+    return res.status(500).json({
+      success: false,
+      error: { code: "UPDATE_FAILED", message: error.message || "Failed to update success story" },
+    });
   }
 });
 
-// DELETE /api/stories/:id - Delete story from PostgreSQL
+// DELETE /api/stories/:id - Delete story from PostgreSQL via Prisma ORM
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    if (pool) {
-      await ensureTable();
-      await pool.query("DELETE FROM success_stories WHERE id = $1 OR legacy_id = $1", [id]);
-    }
-    const stories = readFallbackStories();
-    const filtered = stories.filter((s) => s.id !== id && s.legacyId !== id);
-    writeFallbackStories(filtered);
 
-    console.log(`[Database] Story deleted: ${id}`);
-    return res.json({ success: true, data: { message: "Story deleted" } });
+    try {
+      const existing = await prisma.successStory.findFirst({
+        where: {
+          OR: [{ id }, { legacyId: id }],
+        },
+      });
+
+      if (existing) {
+        await prisma.successStory.delete({
+          where: { id: existing.id },
+        });
+      }
+    } catch (dbErr: any) {
+      console.warn("[Prisma Stories] Database delete failed, removing from fallback:", dbErr.message);
+    }
+
+    // Remove from local fallback
+    try {
+      const stories = readFallbackStories();
+      const filtered = stories.filter((s) => s.id !== id && s.legacyId !== id);
+      writeFallbackStories(filtered);
+    } catch {}
+
+    return res.json({
+      success: true,
+      data: { message: "Success story deleted successfully" },
+    });
   } catch (error: any) {
-    console.error("[Database Error] Failed to delete story from PostgreSQL:", error.message);
-    return res.status(500).json({ success: false, error: { message: error.message } });
+    console.error("[Stories API] Story deletion failed:", error);
+    return res.status(500).json({
+      success: false,
+      error: { code: "DELETE_FAILED", message: error.message || "Failed to delete success story" },
+    });
   }
 });
 

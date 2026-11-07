@@ -30,7 +30,8 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "5mb" }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 // Rate limiting on sensitive authentication routes (e.g. 30 requests per 15 minutes)
 const authLimiter = rateLimit({
