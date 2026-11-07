@@ -278,7 +278,7 @@ export default function SuccessStoriesSection({
             }
             const serverIds = new Set(mappedStories.map((s) => s.id));
             const unsyncedStories = localStories.filter(
-              (s) => s && s.id && (s.id.startsWith("story-") || !s.id.startsWith("mock-")) && !serverIds.has(s.id)
+              (s) => s && s.id && !serverIds.has(s.id)
             );
             if (unsyncedStories.length > 0) {
               for (const unsynced of unsyncedStories) {

@@ -427,10 +427,10 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
             visaGrantDate: item.visaGrantDate || "",
           }));
 
-          // Automatically push any local custom stories that aren't on the backend yet
+          // Automatically push any local stories that aren't on the backend yet
           const backendIds = new Set(mappedStories.map((s) => s.id));
           const localOnlyStories = localStories.filter(
-            (s) => s && s.id && (s.id.startsWith("story-") || !s.id.startsWith("mock-")) && !backendIds.has(s.id)
+            (s) => s && s.id && !backendIds.has(s.id)
           );
 
           if (localOnlyStories.length > 0) {
@@ -1117,26 +1117,51 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
   // Manually force-sync all local success stories to backend database
   const handleSyncLocalToDatabase = async () => {
     setLoading(true);
-    let successCount = 0;
     try {
-      for (const story of activeStories) {
-        // Save to Backend API
-        await storiesApi.create({
-          id: story.id,
-          name: story.name,
-          city: story.city,
-          stream: story.stream,
-          review: story.review,
-          rating: story.rating,
-          clientPic: story.clientPic,
-          visaStamp: story.visaStamp,
-          maskedName: story.maskedName,
-          stampId: story.stampId,
-          visaGrantDate: story.visaGrantDate,
-          isPublished: true,
-        }).catch(() => {});
-        successCount++;
+      // 1. Try dedicated bulk sync endpoint first (atomic write to PostgreSQL)
+      try {
+        const syncRes = await storiesApi.sync(activeStories);
+        if (syncRes && typeof syncRes.count === "number") {
+          if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+            try {
+              const ch = new BroadcastChannel("unihelp_stories_channel");
+              ch.postMessage({ type: "STORIES_UPDATED", stories: activeStories });
+              ch.close();
+            } catch (_e) {}
+          }
+          alert(`🎉 Successfully synchronized ${syncRes.count} success stories to live PostgreSQL database! All visitors worldwide can now view these live entries immediately.`);
+          return;
+        }
+      } catch (bulkErr) {
+        console.warn("Bulk sync endpoint notice, attempting individual upsert:", bulkErr);
       }
+
+      // 2. Sequential fallback if bulk endpoint is unavailable
+      let successCount = 0;
+      let lastError = "";
+      for (const story of activeStories) {
+        try {
+          await storiesApi.create({
+            id: story.id,
+            name: story.name,
+            city: story.city,
+            stream: story.stream,
+            review: story.review,
+            rating: story.rating,
+            clientPic: story.clientPic,
+            visaStamp: story.visaStamp,
+            maskedName: story.maskedName,
+            stampId: story.stampId,
+            visaGrantDate: story.visaGrantDate,
+            isPublished: true,
+          });
+          successCount++;
+        } catch (err: any) {
+          lastError = err.message || "Network error";
+          console.error(`Failed to sync story ${story.id}:`, err);
+        }
+      }
+
       if (typeof window !== "undefined" && "BroadcastChannel" in window) {
         try {
           const ch = new BroadcastChannel("unihelp_stories_channel");
@@ -1144,9 +1169,14 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
           ch.close();
         } catch (_e) {}
       }
-      alert(`🎉 Successfully synchronized ${successCount} success stories to live database! All visitors across all devices can now view these live entries immediately without any restrictions.`);
-    } catch (e) {
-      alert("Notice: Synchronized local stories to application memory.");
+
+      if (successCount > 0) {
+        alert(`🎉 Successfully synchronized ${successCount} of ${activeStories.length} success stories to live database!`);
+      } else {
+        alert(`Error syncing stories to live database: ${lastError || "Could not reach backend API"}. Please verify DATABASE_URL and server connection.`);
+      }
+    } catch (e: any) {
+      alert(`Sync notice: ${e.message || "Synchronized local stories to memory."}`);
     } finally {
       setLoading(false);
     }

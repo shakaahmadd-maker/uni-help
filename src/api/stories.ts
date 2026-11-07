@@ -38,6 +38,13 @@ export const storiesApi = {
     });
   },
 
+  async sync(stories: Partial<SuccessStoryRecord>[]): Promise<{ count: number; data: SuccessStoryRecord[] }> {
+    return apiRequest<{ count: number; data: SuccessStoryRecord[] }>("/api/stories/sync", {
+      method: "POST",
+      body: JSON.stringify({ stories }),
+    });
+  },
+
   async delete(id: string): Promise<void> {
     return apiRequest<void>(`/api/stories/${id}`, {
       method: "DELETE",

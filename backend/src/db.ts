@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import { PrismaClient } from "@prisma/client";
 
 declare global {
@@ -6,12 +9,18 @@ declare global {
 }
 
 // Check if a real database connection is configured in the environment
-export const isDatabaseConfigured = Boolean(
-  process.env.DATABASE_URL &&
-    !process.env.DATABASE_URL.includes("unihelp_dev")
-);
+export function getIsDatabaseConfigured(): boolean {
+  const url = process.env.DATABASE_URL;
+  return Boolean(
+    url &&
+      !url.includes("unihelp_dev") &&
+      (url.startsWith("postgresql://") || url.startsWith("postgres://"))
+  );
+}
 
-// Provide a default connection string so PrismaClient doesn't throw Environment variable not found during build or preview
+export const isDatabaseConfigured = getIsDatabaseConfigured();
+
+// Fallback dummy connection string so PrismaClient does not throw on startup when DATABASE_URL is not yet mapped
 if (!process.env.DATABASE_URL) {
   process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/unihelp_dev?schema=public";
 }

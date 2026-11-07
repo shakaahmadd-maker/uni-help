@@ -63,22 +63,23 @@ model Submission {
 
 model SuccessStory {
   id            String   @id @default(uuid())
-  legacyId      String?  @unique
+  legacyId      String?  @unique @map("legacy_id")
   name          String
-  maskedName    String?
+  maskedName    String?  @map("masked_name")
   city          String
   stream        String
   review        String   @db.Text
   rating        Int      @default(5)
-  clientPic     String?  @db.Text
-  visaStamp     String?  @db.Text
-  stampId       String?
-  visaGrantDate String?
-  isPublished   Boolean  @default(true)
-  displayOrder  Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  clientPic     String?  @map("client_pic") @db.Text
+  visaStamp     String?  @map("visa_stamp") @db.Text
+  stampId       String?  @map("stamp_id")
+  visaGrantDate String?  @map("visa_grant_date")
+  isPublished   Boolean  @default(true) @map("is_published")
+  displayOrder  Int      @default(0) @map("display_order")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
+  @@map("success_stories")
   @@index([city])
   @@index([isPublished])
   @@index([createdAt])
