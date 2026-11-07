@@ -302,9 +302,14 @@ export default function SuccessStoriesSection({
               }
             }
 
+            const prevCount = lastBackendStories.current.length;
             lastBackendStories.current = mappedStories;
             handleLocalUpdate();
             safeCacheStories(mappedStories);
+            // If new stories arrived, reset carousel to front
+            if (mappedStories.length > prevCount) {
+              setCurrentSlideIndex(0);
+            }
           } else {
             handleLocalUpdate();
           }
@@ -326,6 +331,7 @@ export default function SuccessStoriesSection({
             lastBackendStories.current = event.data.stories;
           }
           handleLocalUpdate();
+          setCurrentSlideIndex(0);
         }
       };
     }
@@ -343,8 +349,8 @@ export default function SuccessStoriesSection({
     };
     document.addEventListener("visibilitychange", handleVisibility);
 
-    // 4. Polling timer every 10 seconds so all visitors get new uploads automatically
-    const pollTimer = setInterval(fetchBackendStories, 10000);
+    // 4. Periodic background polling every 5 seconds so all visitors get new uploads automatically without page refresh
+    const pollTimer = setInterval(fetchBackendStories, 5000);
 
     return () => {
       if (storiesChannel) {

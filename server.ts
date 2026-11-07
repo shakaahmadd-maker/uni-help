@@ -35,9 +35,14 @@ function readJsonFile<T>(filePath: string, fallback: T): T {
 
 function writeJsonFile<T>(filePath: string, data: T): void {
   try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    const tempFile = `${filePath}.tmp.${Date.now()}`;
+    fs.writeFileSync(tempFile, JSON.stringify(data, null, 2), "utf-8");
+    fs.renameSync(tempFile, filePath);
   } catch (err) {
     console.error(`[Storage] Error writing ${filePath}:`, err);
+    try {
+      fs.writeFileSync(filePath, JSON.stringify(data, null, 2), "utf-8");
+    } catch (_fallbackErr) {}
   }
 }
 
@@ -75,8 +80,9 @@ app.post("/api/stories", (req: Request, res: Response) => {
     const stories = readJsonFile<any[]>(STORIES_FILE, []);
     const body = req.body || {};
 
+    const targetId = body.id || `story-${Date.now()}`;
     const newStory = {
-      id: body.id || `story-${Date.now()}`,
+      id: targetId,
       legacyId: body.legacyId || body.id || null,
       name: body.name || "Anonymous Student",
       city: body.city || "Global Destination",
@@ -93,8 +99,14 @@ app.post("/api/stories", (req: Request, res: Response) => {
       updatedAt: new Date().toISOString(),
     };
 
-    // Prepend new story to show at the top of the live list
-    stories.unshift(newStory);
+    // If story with this ID already exists, update it; otherwise prepend to the beginning
+    const existingIndex = stories.findIndex((s) => s.id === targetId || (body.legacyId && s.id === body.legacyId));
+    if (existingIndex !== -1) {
+      stories[existingIndex] = { ...stories[existingIndex], ...newStory };
+    } else {
+      stories.unshift(newStory);
+    }
+
     writeJsonFile(STORIES_FILE, stories);
 
     console.log(`[Uni Help API] Live story published: "${newStory.name}" (${newStory.id})`);

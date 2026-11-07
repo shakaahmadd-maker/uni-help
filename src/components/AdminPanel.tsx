@@ -21,7 +21,7 @@ interface Submission {
   notes?: string;
   createdAt: string;
   updatedAt?: string;
-  source?: "firestore" | "local";
+  source?: "database" | "local";
 }
 
 interface AdminPanelProps {
@@ -575,7 +575,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
               notes: sub.notes || "",
               createdAt: sub.createdAt || new Date().toISOString(),
               updatedAt: sub.updatedAt,
-              source: "firestore"
+              source: "database"
             }));
             setSubmissions(items);
             setDbStatus("ACTIVE");
@@ -959,7 +959,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         visaGrantDate: storyVisaGrantDate
       };
 
-      // 1. Authoritative Backend Update
+      // 1. Authoritative Backend API Update
       try {
         await storiesApi.update(editingStoryId, {
           name: updatedStory.name,
@@ -1021,7 +1021,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         visaGrantDate: storyVisaGrantDate
       };
 
-      // 1. Authoritative Backend Creation
+      // 1. Authoritative Backend API Creation
       try {
         await storiesApi.create({
           id: newStory.id,
@@ -1080,7 +1080,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
   const handleDeleteSuccessStory = async (storyId: string) => {
     if (!window.confirm("Are you sure you want to delete this Success Story?")) return;
     
-    // 1. Authoritative Backend Deletion
+    // 1. Authoritative Backend API Deletion
     try {
       await storiesApi.delete(storyId);
     } catch (apiErr) {
