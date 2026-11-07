@@ -5,6 +5,21 @@ const prisma = new PrismaClient();
 
 const INITIAL_STORIES = [
   {
+    legacyId: "story-1794042096342",
+    name: "Ahmad Khan",
+    maskedName: "A*** K***",
+    city: "United Kingdom",
+    stream: "Master of Business Administration",
+    review: "Uni Help made my UK student visa process seamless from admission to visa stamping! Highly recommended.",
+    rating: 5,
+    clientPic: "",
+    visaStamp: "",
+    stampId: "STAMP-973",
+    visaGrantDate: "November 2026",
+    isPublished: true,
+    displayOrder: 0
+  },
+  {
     legacyId: "mock-1",
     name: "Fazal Wadood",
     maskedName: "F***L W****D",
