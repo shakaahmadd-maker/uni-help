@@ -170,7 +170,24 @@ export default function SuccessStoriesSection({
 
   const lastBackendStories = useRef<SuccessStory[]>([]);
 
-  // Live real-time entries sync without Firestore: backend API + multi-tab BroadcastChannel + storage sync
+  // Safe helper to cache stories locally without QuotaExceededError
+  const safeCacheStories = (stories: SuccessStory[]) => {
+    try {
+      localStorage.setItem("global_passages_v3_stories", JSON.stringify(stories));
+    } catch (quotaErr) {
+      console.warn("Storage quota warning, caching lightweight records:", quotaErr);
+      try {
+        const lightweight = stories.map((s) => ({
+          ...s,
+          clientPic: s.clientPic && s.clientPic.startsWith("data:") ? "" : s.clientPic,
+          visaStamp: s.visaStamp && s.visaStamp.startsWith("data:") ? "" : s.visaStamp,
+        }));
+        localStorage.setItem("global_passages_v3_stories", JSON.stringify(lightweight));
+      } catch (_e) {}
+    }
+  };
+
+  // Live real-time entries sync without Firestore: backend API + multi-tab BroadcastChannel + storage sync + polling
   useEffect(() => {
     // BroadcastChannel enables instant cross-tab and cross-window sync across all visitor sessions in the browser
     const storiesChannel = typeof window !== "undefined" && "BroadcastChannel" in window
@@ -180,7 +197,7 @@ export default function SuccessStoriesSection({
     const handleLocalUpdate = () => {
       // Load current local stories first to find any active custom stories
       let localStories: SuccessStory[] = [];
-      const stored = localStorage.getItem("global_passages_v3_stories");
+      const stored = typeof window !== "undefined" ? localStorage.getItem("global_passages_v3_stories") : null;
       if (stored) {
         try {
           localStories = JSON.parse(stored) as SuccessStory[];
@@ -207,7 +224,14 @@ export default function SuccessStoriesSection({
         }
       }
 
-      deduplicated.sort((a, b) => {
+      deduplicated.sort((a: any, b: any) => {
+        if (a.createdAt && b.createdAt) {
+          const timeA = new Date(a.createdAt).getTime();
+          const timeB = new Date(b.createdAt).getTime();
+          if (!isNaN(timeA) && !isNaN(timeB) && timeA !== timeB) {
+            return timeB - timeA;
+          }
+        }
         const aId = a?.id || "";
         const bId = b?.id || "";
         const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
@@ -225,40 +249,41 @@ export default function SuccessStoriesSection({
       setActiveStories(deduplicated);
     };
 
-    // 1. Initial local load
+    const fetchBackendStories = () => {
+      storiesApi
+        .getAll()
+        .then((backendStories) => {
+          if (backendStories && backendStories.length > 0) {
+            const mappedStories: SuccessStory[] = backendStories.map((item) => ({
+              id: item.legacyId || item.id,
+              name: item.name,
+              city: item.city,
+              stream: item.stream,
+              review: item.review,
+              rating: item.rating,
+              clientPic: item.clientPic || "",
+              visaStamp: item.visaStamp || "",
+              maskedName: item.maskedName || "A*** S***",
+              stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
+              visaGrantDate: item.visaGrantDate || "",
+            }));
+            lastBackendStories.current = mappedStories;
+            handleLocalUpdate();
+            safeCacheStories(mappedStories);
+          } else {
+            handleLocalUpdate();
+          }
+        })
+        .catch((_err) => {
+          handleLocalUpdate();
+        });
+    };
+
+    // 1. Initial quick local load + immediate live API fetch
     handleLocalUpdate();
+    fetchBackendStories();
 
-    // 2. Fetch live entries from backend API unconditionally (public endpoint)
-    storiesApi
-      .getAll()
-      .then((backendStories) => {
-        if (backendStories && backendStories.length > 0) {
-          const mappedStories: SuccessStory[] = backendStories.map((item) => ({
-            id: item.legacyId || item.id,
-            name: item.name,
-            city: item.city,
-            stream: item.stream,
-            review: item.review,
-            rating: item.rating,
-            clientPic: item.clientPic || "",
-            visaStamp: item.visaStamp || "",
-            maskedName: item.maskedName || "A*** S***",
-            stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
-            visaGrantDate: item.visaGrantDate || "",
-          }));
-          lastBackendStories.current = mappedStories;
-          handleLocalUpdate();
-          localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
-        } else {
-          handleLocalUpdate();
-        }
-      })
-      .catch((_err) => {
-        // Backend API offline or local preview, continue cleanly with local persistence
-        handleLocalUpdate();
-      });
-
-    // 3. Listen for BroadcastChannel updates from admin panel or other tabs
+    // 2. Listen for BroadcastChannel updates from admin panel or other tabs
     if (storiesChannel) {
       storiesChannel.onmessage = (event) => {
         if (event.data?.type === "STORIES_UPDATED") {
@@ -270,9 +295,21 @@ export default function SuccessStoriesSection({
       };
     }
 
-    // 4. Register listeners for real-time local storage & custom browser events
+    // 3. Register listeners for real-time local storage & custom browser events
     window.addEventListener("storage", handleLocalUpdate);
     window.addEventListener("localStoriesUpdated", handleLocalUpdate);
+    window.addEventListener("storiesChanged", handleLocalUpdate);
+    window.addEventListener("focus", fetchBackendStories);
+    
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") {
+        fetchBackendStories();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+
+    // 4. Polling timer every 10 seconds so all visitors get new uploads automatically
+    const pollTimer = setInterval(fetchBackendStories, 10000);
 
     return () => {
       if (storiesChannel) {
@@ -280,6 +317,10 @@ export default function SuccessStoriesSection({
       }
       window.removeEventListener("storage", handleLocalUpdate);
       window.removeEventListener("localStoriesUpdated", handleLocalUpdate);
+      window.removeEventListener("storiesChanged", handleLocalUpdate);
+      window.removeEventListener("focus", fetchBackendStories);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      clearInterval(pollTimer);
     };
   }, []);
 
@@ -300,19 +341,22 @@ export default function SuccessStoriesSection({
     return () => clearInterval(timer);
   }, [autoplay, activeStories.length, viewMode]);
 
-  // Safety guard: scale down slide index if stories are deleted, or reset to 0 when a new story is added (list length increases)
+  // Safety guard: scale down slide index if stories are deleted, or reset to 0 when a new story is added (list length increases or top story changes)
   const prevLengthRef = React.useRef(activeStories.length);
+  const prevFirstIdRef = React.useRef(activeStories[0]?.id);
   useEffect(() => {
+    const currentFirstId = activeStories[0]?.id;
     if (activeStories.length === 0) {
       setCurrentSlideIndex(0);
-    } else if (activeStories.length > prevLengthRef.current) {
-      // New story uploaded/synced, jump directly to the beginning to showcase it!
+    } else if (activeStories.length > prevLengthRef.current || (currentFirstId && currentFirstId !== prevFirstIdRef.current)) {
+      // New story uploaded/synced, jump directly to the beginning to showcase it immediately!
       setCurrentSlideIndex(0);
     } else if (currentSlideIndex >= activeStories.length) {
       setCurrentSlideIndex(0); // reset to beginning safely
     }
     prevLengthRef.current = activeStories.length;
-  }, [activeStories.length, currentSlideIndex]);
+    prevFirstIdRef.current = currentFirstId;
+  }, [activeStories, currentSlideIndex]);
 
   const handlePrevSlide = () => {
     if (activeStories.length === 0) return;

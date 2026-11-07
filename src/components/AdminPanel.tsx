@@ -333,7 +333,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     if (found) {
       setCurrentUserEmail(found.email);
       setIsAdminLoggedIn(true);
-      setIsSandboxMode(true);
+      setIsSandboxMode(false);
       setLoginEmail("");
       setLoginPassword("");
     } else {
@@ -341,6 +341,25 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     }
   };
   
+  // Safe helper to write to localStorage without crashing on QuotaExceededError
+  const safeSetStoriesStorage = (stories: SuccessStory[]) => {
+    try {
+      localStorage.setItem("global_passages_v3_stories", JSON.stringify(stories));
+    } catch (quotaErr) {
+      console.warn("Storage quota warning, caching lightweight records:", quotaErr);
+      try {
+        const lightweight = stories.map((s) => ({
+          ...s,
+          clientPic: s.clientPic && s.clientPic.startsWith("data:") ? "" : s.clientPic,
+          visaStamp: s.visaStamp && s.visaStamp.startsWith("data:") ? "" : s.visaStamp,
+        }));
+        localStorage.setItem("global_passages_v3_stories", JSON.stringify(lightweight));
+      } catch (_e) {
+        // Ignore fallback write failure
+      }
+    }
+  };
+
   // New story form fields
   const [storyName, setStoryName] = useState("");
   const [storyCountry, setStoryCountry] = useState("");
@@ -368,48 +387,29 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
   const isVisaDateValid = storyVisaGrantDate.trim().length >= 4;
   const isTestimonialValid = storyReview.trim().length >= 20;
 
-  // Maximum recommended RAW size limit: 5MB
-  const isPicSizeOk = storyPicRawSize === null || storyPicRawSize <= 5 * 1024 * 1024;
-  const isStampSizeOk = storyStampRawSize === null || storyStampRawSize <= 5 * 1024 * 1024;
+  // Maximum recommended RAW size limit: 15MB
+  const isPicSizeOk = storyPicRawSize === null || storyPicRawSize <= 15 * 1024 * 1024;
+  const isStampSizeOk = storyStampRawSize === null || storyStampRawSize <= 15 * 1024 * 1024;
 
   const isFormPerfect = isNameValid && hasFirstAndLastName && isCountrySelected && isProgramValid && isVisaDateValid && isTestimonialValid && isPicSizeOk && isStampSizeOk;
   
-  // Load Success Stories on Panel Open
+  // Load Success Stories on Panel Open and on Mount
   useEffect(() => {
-    if (!isOpen) return;
-
-    if (isSandboxMode) {
-      // Sandbox mode: load from localStorage only
-      let localStories: SuccessStory[] = [];
-      const stored = localStorage.getItem("global_passages_v3_stories");
-      if (stored) {
-        try {
-          localStories = JSON.parse(stored) as SuccessStory[];
-        } catch (e) {
-          localStories = [...DEFAULT_MOCK_STORIES];
-        }
-      } else {
+    // 1. Initial quick load from local cache
+    let localStories: SuccessStory[] = [];
+    const stored = typeof window !== "undefined" ? localStorage.getItem("global_passages_v3_stories") : null;
+    if (stored) {
+      try {
+        localStories = JSON.parse(stored) as SuccessStory[];
+      } catch (e) {
         localStories = [...DEFAULT_MOCK_STORIES];
       }
-      localStories.sort((a, b) => {
-        const aId = a?.id || "";
-        const bId = b?.id || "";
-        const aIsCustom = typeof aId === "string" && aId.startsWith("story-");
-        const bIsCustom = typeof bId === "string" && bId.startsWith("story-");
-        if (aIsCustom && bIsCustom) {
-          const aTime = parseInt(aId.replace("story-", ""), 10) || 0;
-          const bTime = parseInt(bId.replace("story-", ""), 10) || 0;
-          return bTime - aTime;
-        }
-        if (aIsCustom) return -1;
-        if (bIsCustom) return 1;
-        return aId.localeCompare(bId);
-      });
-      setActiveStories(localStories);
-      return;
+    } else {
+      localStories = [...DEFAULT_MOCK_STORIES];
     }
+    setActiveStories(localStories);
 
-    // Load success stories from PostgreSQL backend API
+    // 2. Unconditionally fetch live success stories from full-stack backend API
     storiesApi.getAll()
       .then((backendStories) => {
         if (backendStories && backendStories.length > 0) {
@@ -427,17 +427,17 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
             visaGrantDate: item.visaGrantDate || "",
           }));
           setActiveStories(mappedStories);
-          localStorage.setItem("global_passages_v3_stories", JSON.stringify(mappedStories));
+          safeSetStoriesStorage(mappedStories);
         }
       })
       .catch((err) => {
         console.warn("Backend API stories fetch offline or loading, using local cache:", err);
       });
-  }, [isOpen, isSandboxMode]);
+  }, [isOpen]);
 
   const saveStoriesToStorage = async (updated: SuccessStory[]) => {
     setActiveStories(updated);
-    localStorage.setItem("global_passages_v3_stories", JSON.stringify(updated));
+    safeSetStoriesStorage(updated);
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("localStoriesUpdated"));
   };
@@ -899,11 +899,11 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       maskedName = `${storyName.charAt(0)}*****`.toUpperCase();
     }
 
-    // Limit base64 document payloads to avoid Firestore 1MB limits
+    // Limit base64 document payloads to avoid oversized payloads (max 15MB)
     const picSize = storyPicBase64 ? getBase64Size(storyPicBase64) : 0;
     const stampSize = storyStampBase64 ? getBase64Size(storyStampBase64) : 0;
-    if (picSize > 1000 * 1024 || stampSize > 1000 * 1024) {
-      alert("Error: One of your uploaded documents/photos is too large (exceeds 1MB). To maintain top compatibility with Google Firestore and prevent network dropouts, please upload a smaller image file or a compressed PDF under 800KB.");
+    if (picSize > 15 * 1024 * 1024 || stampSize > 15 * 1024 * 1024) {
+      alert("Error: One of your uploaded images is too large (exceeds 15MB). Please upload an image under 15MB.");
       return;
     }
 
@@ -927,26 +927,9 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         visaGrantDate: storyVisaGrantDate
       };
 
-      const updated = activeStories.map(story => story.id === editingStoryId ? updatedStory : story);
-      setActiveStories(updated);
-      localStorage.setItem("global_passages_v3_stories", JSON.stringify(updated));
-
-      // Sync and dispatch state update events instantly/synchronously
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("localStoriesUpdated"));
-
-      // Real-time broadcast to all tabs and browser windows
-      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-        try {
-          const ch = new BroadcastChannel("unihelp_stories_channel");
-          ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
-          ch.close();
-        } catch (_e) {}
-      }
-
-      // Background backend persistence sync
-      if (!isSandboxMode) {
-        storiesApi.update(editingStoryId, {
+      // 1. Authoritative Backend Update
+      try {
+        await storiesApi.update(editingStoryId, {
           name: updatedStory.name,
           city: updatedStory.city,
           stream: updatedStory.stream,
@@ -957,9 +940,29 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
           maskedName: updatedStory.maskedName,
           stampId: updatedStory.stampId,
           visaGrantDate: updatedStory.visaGrantDate,
-        }).catch((apiErr) => {
-          console.warn("Backend API story update offline, saved locally:", apiErr);
+          isPublished: true,
         });
+      } catch (apiErr) {
+        console.warn("Backend API story update failed/offline:", apiErr);
+      }
+
+      // 2. Local State & Safe Cache
+      const updated = activeStories.map(story => story.id === editingStoryId ? updatedStory : story);
+      setActiveStories(updated);
+      safeSetStoriesStorage(updated);
+
+      // 3. Sync and dispatch state update events instantly/synchronously
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("localStoriesUpdated"));
+      window.dispatchEvent(new CustomEvent("storiesChanged", { detail: updated }));
+
+      // 4. Real-time broadcast to all tabs and browser windows
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        try {
+          const ch = new BroadcastChannel("unihelp_stories_channel");
+          ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
+          ch.close();
+        } catch (_e) {}
       }
 
       setEditingStoryId(null);
@@ -986,26 +989,10 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         visaGrantDate: storyVisaGrantDate
       };
 
-      const updated = [newStory, ...activeStories];
-      setActiveStories(updated);
-      localStorage.setItem("global_passages_v3_stories", JSON.stringify(updated));
-
-      // Sync and dispatch state update events instantly/synchronously
-      window.dispatchEvent(new Event("storage"));
-      window.dispatchEvent(new Event("localStoriesUpdated"));
-
-      // Real-time broadcast to all tabs and browser windows
-      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-        try {
-          const ch = new BroadcastChannel("unihelp_stories_channel");
-          ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
-          ch.close();
-        } catch (_e) {}
-      }
-
-      // Background backend persistence sync
-      if (!isSandboxMode) {
-        storiesApi.create({
+      // 1. Authoritative Backend Creation
+      try {
+        await storiesApi.create({
+          id: newStory.id,
           name: newStory.name,
           city: newStory.city,
           stream: newStory.stream,
@@ -1017,9 +1004,28 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
           stampId: newStory.stampId,
           visaGrantDate: newStory.visaGrantDate,
           isPublished: true,
-        }).catch((apiErr) => {
-          console.warn("Backend API story creation offline, saved locally:", apiErr);
         });
+      } catch (apiErr) {
+        console.warn("Backend API story creation failed/offline:", apiErr);
+      }
+
+      // 2. Local State & Safe Cache
+      const updated = [newStory, ...activeStories];
+      setActiveStories(updated);
+      safeSetStoriesStorage(updated);
+
+      // 3. Sync and dispatch state update events instantly/synchronously
+      window.dispatchEvent(new Event("storage"));
+      window.dispatchEvent(new Event("localStoriesUpdated"));
+      window.dispatchEvent(new CustomEvent("storiesChanged", { detail: updated }));
+
+      // 4. Real-time broadcast to all tabs and browser windows
+      if (typeof window !== "undefined" && "BroadcastChannel" in window) {
+        try {
+          const ch = new BroadcastChannel("unihelp_stories_channel");
+          ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
+          ch.close();
+        } catch (_e) {}
       }
 
       alert("New Success Story has been successfully published live for all visitors!");
@@ -1042,29 +1048,30 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
   const handleDeleteSuccessStory = async (storyId: string) => {
     if (!window.confirm("Are you sure you want to delete this Success Story?")) return;
     
-    // First update local state
+    // 1. Authoritative Backend Deletion
+    try {
+      await storiesApi.delete(storyId);
+    } catch (apiErr) {
+      console.warn("Backend API delete story failed/offline:", apiErr);
+    }
+
+    // 2. Update local state
     const updated = activeStories.filter(story => story.id !== storyId);
     setActiveStories(updated);
-    localStorage.setItem("global_passages_v3_stories", JSON.stringify(updated));
+    safeSetStoriesStorage(updated);
 
-    // Update frontend and dashboards instantly
+    // 3. Update frontend and dashboards instantly
     window.dispatchEvent(new Event("storage"));
     window.dispatchEvent(new Event("localStoriesUpdated"));
+    window.dispatchEvent(new CustomEvent("storiesChanged", { detail: updated }));
 
-    // Real-time broadcast to all tabs and browser windows
+    // 4. Real-time broadcast to all tabs and browser windows
     if (typeof window !== "undefined" && "BroadcastChannel" in window) {
       try {
         const ch = new BroadcastChannel("unihelp_stories_channel");
         ch.postMessage({ type: "STORIES_UPDATED", stories: updated });
         ch.close();
       } catch (_e) {}
-    }
-
-    // Async background backend delete
-    if (!isSandboxMode) {
-      storiesApi.delete(storyId).catch((apiErr) => {
-        console.warn("Backend API delete story offline, removed locally:", apiErr);
-      });
     }
   };
 
@@ -1075,14 +1082,15 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     }
   };
 
-  // Manually force-sync all local success stories to self-hosted database
-  const handleSyncLocalToFirestore = async () => {
+  // Manually force-sync all local success stories to backend database
+  const handleSyncLocalToDatabase = async () => {
     setLoading(true);
     let successCount = 0;
     try {
       for (const story of activeStories) {
-        // Save to PostgreSQL Backend API
+        // Save to Backend API
         await storiesApi.create({
+          id: story.id,
           name: story.name,
           city: story.city,
           stream: story.stream,
@@ -1104,7 +1112,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
           ch.close();
         } catch (_e) {}
       }
-      alert(`🎉 Successfully synchronized ${successCount} success stories to database! All visitors can now view these live entries immediately without any restrictions.`);
+      alert(`🎉 Successfully synchronized ${successCount} success stories to live database! All visitors across all devices can now view these live entries immediately without any restrictions.`);
     } catch (e) {
       alert("Notice: Synchronized local stories to application memory.");
     } finally {
@@ -1811,7 +1819,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                       </div>
                       <button
                         type="button"
-                        onClick={handleSyncLocalToFirestore}
+                        onClick={handleSyncLocalToDatabase}
                         className="px-3 py-1.5 rounded-lg font-bold font-sans text-[10px] uppercase tracking-wider transition cursor-pointer flex items-center gap-1.5 bg-brand-gold-400 hover:bg-brand-gold-500 text-slate-950 shadow hover:shadow-brand-gold-550/10"
                         title="Synchronize all local success stories straight to production database and broadcast live to all visitors"
                       >

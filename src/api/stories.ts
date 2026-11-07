@@ -24,7 +24,7 @@ export const storiesApi = {
     return apiRequest<SuccessStoryRecord[]>("/api/stories");
   },
 
-  async create(data: Omit<SuccessStoryRecord, "id">): Promise<SuccessStoryRecord> {
+  async create(data: Partial<SuccessStoryRecord> & { name: string; city: string; stream: string; review: string; rating: number }): Promise<SuccessStoryRecord> {
     return apiRequest<SuccessStoryRecord>("/api/stories", {
       method: "POST",
       body: JSON.stringify(data),
