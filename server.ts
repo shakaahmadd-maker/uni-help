@@ -2,6 +2,7 @@ import express, { Request, Response } from "express";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import storiesRouter from "./backend/src/routes/stories";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -62,127 +63,9 @@ app.use((req, res, next) => {
 });
 
 // ==========================================
-// API ROUTES: SUCCESS STORIES (PUBLIC & UNRESTRICTED)
+// API ROUTES: SUCCESS STORIES (DOKPLOY POSTGRESQL + STORAGE)
 // ==========================================
-
-// GET /api/stories - Return all live success stories
-app.get("/api/stories", (_req: Request, res: Response) => {
-  const stories = readJsonFile<any[]>(STORIES_FILE, []);
-  res.json({
-    success: true,
-    data: stories,
-  });
-});
-
-// POST /api/stories - Upload/publish new success story
-app.post("/api/stories", (req: Request, res: Response) => {
-  try {
-    const stories = readJsonFile<any[]>(STORIES_FILE, []);
-    const body = req.body || {};
-
-    const targetId = body.id || `story-${Date.now()}`;
-    const newStory = {
-      id: targetId,
-      legacyId: body.legacyId || body.id || null,
-      name: body.name || "Anonymous Student",
-      city: body.city || "Global Destination",
-      stream: body.stream || "Academic Degree",
-      review: body.review || "",
-      rating: typeof body.rating === "number" ? body.rating : 5,
-      clientPic: body.clientPic || "",
-      visaStamp: body.visaStamp || "",
-      maskedName: body.maskedName || `${(body.name || "Student").charAt(0)}***`,
-      stampId: body.stampId || `STAMP-${Math.floor(100 + Math.random() * 900)}`,
-      visaGrantDate: body.visaGrantDate || "",
-      isPublished: true,
-      createdAt: body.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    // If story with this ID already exists, update it; otherwise prepend to the beginning
-    const existingIndex = stories.findIndex((s) => s.id === targetId || (body.legacyId && s.id === body.legacyId));
-    if (existingIndex !== -1) {
-      stories[existingIndex] = { ...stories[existingIndex], ...newStory };
-    } else {
-      stories.unshift(newStory);
-    }
-
-    writeJsonFile(STORIES_FILE, stories);
-
-    console.log(`[Uni Help API] Live story published: "${newStory.name}" (${newStory.id})`);
-    res.status(201).json({
-      success: true,
-      data: newStory,
-    });
-  } catch (err: any) {
-    console.error("[Uni Help API] Story creation failed:", err);
-    res.status(500).json({
-      success: false,
-      error: { code: "CREATE_FAILED", message: err.message || "Failed to create story" },
-    });
-  }
-});
-
-// PUT /api/stories/:id - Update existing success story
-app.put("/api/stories/:id", (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const stories = readJsonFile<any[]>(STORIES_FILE, []);
-    const index = stories.findIndex((s) => s.id === id || s.legacyId === id);
-
-    if (index === -1) {
-      return res.status(404).json({
-        success: false,
-        error: { code: "NOT_FOUND", message: "Success story not found" },
-      });
-    }
-
-    const updated = {
-      ...stories[index],
-      ...req.body,
-      id: stories[index].id,
-      updatedAt: new Date().toISOString(),
-    };
-
-    stories[index] = updated;
-    writeJsonFile(STORIES_FILE, stories);
-
-    console.log(`[Uni Help API] Live story updated: "${updated.name}" (${updated.id})`);
-    res.json({
-      success: true,
-      data: updated,
-    });
-  } catch (err: any) {
-    console.error("[Uni Help API] Story update failed:", err);
-    res.status(500).json({
-      success: false,
-      error: { code: "UPDATE_FAILED", message: err.message || "Failed to update story" },
-    });
-  }
-});
-
-// DELETE /api/stories/:id - Delete success story
-app.delete("/api/stories/:id", (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const stories = readJsonFile<any[]>(STORIES_FILE, []);
-    const filtered = stories.filter((s) => s.id !== id && s.legacyId !== id);
-
-    writeJsonFile(STORIES_FILE, filtered);
-    console.log(`[Uni Help API] Live story deleted: ${id}`);
-
-    res.json({
-      success: true,
-      data: { message: "Success story deleted successfully" },
-    });
-  } catch (err: any) {
-    console.error("[Uni Help API] Story deletion failed:", err);
-    res.status(500).json({
-      success: false,
-      error: { code: "DELETE_FAILED", message: err.message || "Failed to delete story" },
-    });
-  }
-});
+app.use("/api/stories", storiesRouter);
 
 // ==========================================
 // API ROUTES: HEALTH CHECK
