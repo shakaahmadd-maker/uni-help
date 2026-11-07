@@ -1,5 +1,5 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../db.js";
+import { prisma, isDatabaseConfigured } from "../db.js";
 import path from "path";
 import fs from "fs";
 
@@ -29,20 +29,27 @@ function writeFallbackStories(stories: any[]): void {
   }
 }
 
-// GET /api/stories - Fetch all success stories from PostgreSQL via Prisma ORM
+// GET /api/stories - Fetch all success stories
 // 100% Unrestricted: zero auth blockers, zero sandbox gates, public access
 router.get("/", async (_req: Request, res: Response) => {
   try {
-    const stories = await prisma.successStory.findMany({
-      orderBy: { createdAt: "desc" },
-    });
+    if (isDatabaseConfigured) {
+      const stories = await prisma.successStory.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+      return res.json({
+        success: true,
+        data: stories,
+      });
+    }
 
+    const fallback = readFallbackStories();
     return res.json({
       success: true,
-      data: stories,
+      data: fallback,
     });
   } catch (error: any) {
-    console.warn("[Prisma Stories] Database query failed, using fallback storage:", error.message);
+    console.warn("[Prisma Stories] Database query error, using fallback storage:", error.message);
     const fallback = readFallbackStories();
     return res.json({
       success: true,
@@ -51,7 +58,7 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/stories - Create or upsert a success story via Prisma ORM
+// POST /api/stories - Create or upsert a success story
 // Supports Base64 image payloads (clientPic, visaStamp) and handles id / legacyId
 router.post("/", async (req: Request, res: Response) => {
   try {
@@ -74,57 +81,62 @@ router.post("/", async (req: Request, res: Response) => {
 
     let storyRecord: any = null;
 
-    try {
-      const existing = await prisma.successStory.findFirst({
-        where: {
-          OR: [
-            { id: targetId },
-            ...(legacyId ? [{ legacyId }] : []),
-          ],
-        },
-      });
+    if (isDatabaseConfigured) {
+      try {
+        const existing = await prisma.successStory.findFirst({
+          where: {
+            OR: [
+              { id: targetId },
+              ...(legacyId ? [{ legacyId }] : []),
+            ],
+          },
+        });
 
-      if (existing) {
-        storyRecord = await prisma.successStory.update({
-          where: { id: existing.id },
-          data: {
-            name,
-            maskedName,
-            city,
-            stream,
-            review,
-            rating,
-            clientPic,
-            visaStamp,
-            stampId,
-            visaGrantDate,
-            isPublished,
-            displayOrder,
-          },
-        });
-      } else {
-        storyRecord = await prisma.successStory.create({
-          data: {
-            id: targetId,
-            legacyId,
-            name,
-            maskedName,
-            city,
-            stream,
-            review,
-            rating,
-            clientPic,
-            visaStamp,
-            stampId,
-            visaGrantDate,
-            isPublished,
-            displayOrder,
-            createdAt,
-          },
-        });
+        if (existing) {
+          storyRecord = await prisma.successStory.update({
+            where: { id: existing.id },
+            data: {
+              name,
+              maskedName,
+              city,
+              stream,
+              review,
+              rating,
+              clientPic,
+              visaStamp,
+              stampId,
+              visaGrantDate,
+              isPublished,
+              displayOrder,
+            },
+          });
+        } else {
+          storyRecord = await prisma.successStory.create({
+            data: {
+              id: targetId,
+              legacyId,
+              name,
+              maskedName,
+              city,
+              stream,
+              review,
+              rating,
+              clientPic,
+              visaStamp,
+              stampId,
+              visaGrantDate,
+              isPublished,
+              displayOrder,
+              createdAt,
+            },
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn("[Prisma Stories] Database write failed, falling back to JSON storage:", dbErr.message);
       }
-    } catch (dbErr: any) {
-      console.warn("[Prisma Stories] Database write failed, falling back to JSON storage:", dbErr.message);
+    }
+
+    if (!storyRecord) {
       storyRecord = {
         id: targetId,
         legacyId,
@@ -154,7 +166,7 @@ router.post("/", async (req: Request, res: Response) => {
       writeFallbackStories(fileStories);
     } catch {}
 
-    console.log(`[Prisma Stories] Story saved: "${name}" (${storyRecord.id})`);
+    console.log(`[Stories API] Story saved: "${name}" (${storyRecord.id})`);
     return res.status(201).json({
       success: true,
       data: storyRecord,
@@ -168,46 +180,46 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/stories/:id - Update existing success story in PostgreSQL via Prisma ORM
+// PUT /api/stories/:id - Update existing success story
 router.put("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const body = req.body || {};
     let updatedRecord: any = null;
 
-    try {
-      const existing = await prisma.successStory.findFirst({
-        where: {
-          OR: [{ id }, { legacyId: id }],
-        },
-      });
-
-      if (!existing) {
-        return res.status(404).json({
-          success: false,
-          error: { code: "NOT_FOUND", message: "Success story not found" },
+    if (isDatabaseConfigured) {
+      try {
+        const existing = await prisma.successStory.findFirst({
+          where: {
+            OR: [{ id }, { legacyId: id }],
+          },
         });
-      }
 
-      updatedRecord = await prisma.successStory.update({
-        where: { id: existing.id },
-        data: {
-          ...(body.name !== undefined && { name: body.name }),
-          ...(body.maskedName !== undefined && { maskedName: body.maskedName }),
-          ...(body.city !== undefined && { city: body.city }),
-          ...(body.stream !== undefined && { stream: body.stream }),
-          ...(body.review !== undefined && { review: body.review }),
-          ...(body.rating !== undefined && { rating: typeof body.rating === "number" ? body.rating : 5 }),
-          ...(body.clientPic !== undefined && { clientPic: body.clientPic }),
-          ...(body.visaStamp !== undefined && { visaStamp: body.visaStamp }),
-          ...(body.stampId !== undefined && { stampId: body.stampId }),
-          ...(body.visaGrantDate !== undefined && { visaGrantDate: body.visaGrantDate }),
-          ...(body.isPublished !== undefined && { isPublished: Boolean(body.isPublished) }),
-          ...(body.displayOrder !== undefined && { displayOrder: Number(body.displayOrder) }),
-        },
-      });
-    } catch (dbErr: any) {
-      console.warn("[Prisma Stories] Database update failed, falling back to JSON storage:", dbErr.message);
+        if (existing) {
+          updatedRecord = await prisma.successStory.update({
+            where: { id: existing.id },
+            data: {
+              ...(body.name !== undefined && { name: body.name }),
+              ...(body.maskedName !== undefined && { maskedName: body.maskedName }),
+              ...(body.city !== undefined && { city: body.city }),
+              ...(body.stream !== undefined && { stream: body.stream }),
+              ...(body.review !== undefined && { review: body.review }),
+              ...(body.rating !== undefined && { rating: typeof body.rating === "number" ? body.rating : 5 }),
+              ...(body.clientPic !== undefined && { clientPic: body.clientPic }),
+              ...(body.visaStamp !== undefined && { visaStamp: body.visaStamp }),
+              ...(body.stampId !== undefined && { stampId: body.stampId }),
+              ...(body.visaGrantDate !== undefined && { visaGrantDate: body.visaGrantDate }),
+              ...(body.isPublished !== undefined && { isPublished: Boolean(body.isPublished) }),
+              ...(body.displayOrder !== undefined && { displayOrder: Number(body.displayOrder) }),
+            },
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn("[Prisma Stories] Database update failed, falling back to JSON storage:", dbErr.message);
+      }
+    }
+
+    if (!updatedRecord) {
       const stories = readFallbackStories();
       const idx = stories.findIndex((s) => s.id === id || s.legacyId === id);
       if (idx === -1) {
@@ -242,25 +254,27 @@ router.put("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/stories/:id - Delete story from PostgreSQL via Prisma ORM
+// DELETE /api/stories/:id - Delete story
 router.delete("/:id", async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
-    try {
-      const existing = await prisma.successStory.findFirst({
-        where: {
-          OR: [{ id }, { legacyId: id }],
-        },
-      });
-
-      if (existing) {
-        await prisma.successStory.delete({
-          where: { id: existing.id },
+    if (isDatabaseConfigured) {
+      try {
+        const existing = await prisma.successStory.findFirst({
+          where: {
+            OR: [{ id }, { legacyId: id }],
+          },
         });
+
+        if (existing) {
+          await prisma.successStory.delete({
+            where: { id: existing.id },
+          });
+        }
+      } catch (dbErr: any) {
+        console.warn("[Prisma Stories] Database delete failed, removing from fallback:", dbErr.message);
       }
-    } catch (dbErr: any) {
-      console.warn("[Prisma Stories] Database delete failed, removing from fallback:", dbErr.message);
     }
 
     // Remove from local fallback

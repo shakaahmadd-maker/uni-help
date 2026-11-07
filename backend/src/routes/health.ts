@@ -1,12 +1,21 @@
 import { Router, Request, Response } from "express";
-import { prisma } from "../db.js";
+import { prisma, isDatabaseConfigured } from "../db.js";
 
 const router = Router();
 
 // GET /api/health
 // Always returns HTTP 200 JSON so Docker / Traefik health checks never trigger a 502 Bad Gateway
-router.get("/", async (req: Request, res: Response) => {
+router.get("/", async (_req: Request, res: Response) => {
   try {
+    if (!isDatabaseConfigured) {
+      return res.status(200).json({
+        status: "ok",
+        database: "local_storage",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+      });
+    }
+
     // Check PostgreSQL connection
     await prisma.$queryRaw`SELECT 1`;
     return res.status(200).json({
