@@ -411,7 +411,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
 
     // 2. Unconditionally fetch live success stories from full-stack backend API
     storiesApi.getAll()
-      .then((backendStories) => {
+      .then(async (backendStories) => {
         if (backendStories && backendStories.length > 0) {
           const mappedStories: SuccessStory[] = backendStories.map((item) => ({
             id: item.legacyId || item.id,
@@ -426,6 +426,38 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
             stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
             visaGrantDate: item.visaGrantDate || "",
           }));
+
+          // Automatically push any local custom stories that aren't on the backend yet
+          const backendIds = new Set(mappedStories.map((s) => s.id));
+          const localOnlyStories = localStories.filter(
+            (s) => s && s.id && (s.id.startsWith("story-") || !s.id.startsWith("mock-")) && !backendIds.has(s.id)
+          );
+
+          if (localOnlyStories.length > 0) {
+            console.log(`[Auto-Sync] Syncing ${localOnlyStories.length} local stories to server...`);
+            for (const story of localOnlyStories) {
+              try {
+                await storiesApi.create({
+                  id: story.id,
+                  name: story.name,
+                  city: story.city,
+                  stream: story.stream,
+                  review: story.review,
+                  rating: story.rating,
+                  clientPic: story.clientPic,
+                  visaStamp: story.visaStamp,
+                  maskedName: story.maskedName,
+                  stampId: story.stampId,
+                  visaGrantDate: story.visaGrantDate,
+                  isPublished: true,
+                });
+                mappedStories.unshift(story);
+              } catch (e) {
+                console.warn("[Auto-Sync] Upload error:", e);
+              }
+            }
+          }
+
           setActiveStories(mappedStories);
           safeSetStoriesStorage(mappedStories);
         }

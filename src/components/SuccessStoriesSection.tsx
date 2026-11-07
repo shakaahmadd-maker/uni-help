@@ -252,7 +252,7 @@ export default function SuccessStoriesSection({
     const fetchBackendStories = () => {
       storiesApi
         .getAll()
-        .then((backendStories) => {
+        .then(async (backendStories) => {
           if (backendStories && backendStories.length > 0) {
             const mappedStories: SuccessStory[] = backendStories.map((item) => ({
               id: item.legacyId || item.id,
@@ -267,6 +267,41 @@ export default function SuccessStoriesSection({
               stampId: item.stampId || `STAMP-${item.id.slice(-4)}`,
               visaGrantDate: item.visaGrantDate || "",
             }));
+
+            // Auto-sync: Push any custom stories from local storage that are not yet on the server
+            let localStories: SuccessStory[] = [];
+            const stored = typeof window !== "undefined" ? localStorage.getItem("global_passages_v3_stories") : null;
+            if (stored) {
+              try {
+                localStories = JSON.parse(stored) as SuccessStory[];
+              } catch (_e) {}
+            }
+            const serverIds = new Set(mappedStories.map((s) => s.id));
+            const unsyncedStories = localStories.filter(
+              (s) => s && s.id && (s.id.startsWith("story-") || !s.id.startsWith("mock-")) && !serverIds.has(s.id)
+            );
+            if (unsyncedStories.length > 0) {
+              for (const unsynced of unsyncedStories) {
+                try {
+                  await storiesApi.create({
+                    id: unsynced.id,
+                    name: unsynced.name,
+                    city: unsynced.city,
+                    stream: unsynced.stream,
+                    review: unsynced.review,
+                    rating: unsynced.rating,
+                    clientPic: unsynced.clientPic,
+                    visaStamp: unsynced.visaStamp,
+                    maskedName: unsynced.maskedName,
+                    stampId: unsynced.stampId,
+                    visaGrantDate: unsynced.visaGrantDate,
+                    isPublished: true,
+                  });
+                  mappedStories.unshift(unsynced);
+                } catch (_e) {}
+              }
+            }
+
             lastBackendStories.current = mappedStories;
             handleLocalUpdate();
             safeCacheStories(mappedStories);
