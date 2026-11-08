@@ -52,7 +52,7 @@ export const registerAdminSchema = z.object({
   email: z.string().email("Valid email required"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   name: z.string().max(100).optional(),
-  role: z.enum(["SUPER_ADMIN", "ADMISSIONS_COACH", "VISA_SPECIALIST", "OPERATIONS_LEAD", "COUNSELOR"]).optional().default("ADMISSIONS_COACH"),
+  role: z.enum(["SUPER_ADMIN", "ADMIN", "ADMISSIONS_COACH", "VISA_SPECIALIST", "OPERATIONS_LEAD", "COUNSELOR"]).optional().default("ADMIN"),
 });
 
 export const storySchema = z.object({

@@ -7,8 +7,8 @@ import { Role } from "@prisma/client";
 
 const router = Router();
 
-// Only Super Admins can manage credentials
-router.use(requireAuth, requireRole([Role.SUPER_ADMIN]));
+// Super Admins and Admins can manage credentials
+router.use(requireAuth, requireRole([Role.SUPER_ADMIN, Role.ADMIN]));
 
 // GET /api/admin/credentials
 router.get("/", async (req: Request, res: Response) => {

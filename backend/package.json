@@ -11,6 +11,7 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
     "db:seed": "tsx prisma/seed.ts",
+    "db:seed:admin": "tsx prisma/seed-admin.ts",
     "db:studio": "prisma studio",
     "migrate:firebase:dry": "tsx scripts/migrate-firebase.ts --dry-run",
     "migrate:firebase": "tsx scripts/migrate-firebase.ts",

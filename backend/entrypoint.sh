@@ -7,6 +7,12 @@ if [ -n "$DATABASE_URL" ]; then
   npx prisma migrate deploy
   echo "[Uni Help Backend] Seeding initial database records (admins & success stories)..."
   npx prisma db seed || true
+
+  # Auto-provision admin if environment variables are provided
+  if [ -n "$ADMIN_EMAIL" ] && [ -n "$ADMIN_INITIAL_PASSWORD" ]; then
+    echo "[Uni Help Backend] Auto-provisioning administrator from environment variables..."
+    npm run db:seed:admin || true
+  fi
 else
   echo "[Uni Help Backend] DATABASE_URL not set; skipping database migrations."
 fi
