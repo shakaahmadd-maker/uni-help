@@ -8,6 +8,7 @@ import { authApi } from "../api/auth";
 import { submissionsApi } from "../api/submissions";
 import { storiesApi } from "../api/stories";
 import { healthApi } from "../api/health";
+import { getAuthToken, setAuthToken } from "../api/client";
 import { SuccessStory, DEFAULT_MOCK_STORIES } from "./SuccessStoriesSection";
 
 interface Submission {
@@ -1127,53 +1128,20 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     }
   };
 
-  // Manually force-sync all local success stories to backend database
+  // Manually force-sync all local success stories to backend database via POST /api/stories/sync
   const handleSyncLocalToDatabase = async () => {
+    // 1. Verify admin token exists before initiating sync
+    const token = getAuthToken();
+    if (!token) {
+      alert("Please log in again as an administrator.");
+      setIsAdminLoggedIn(false);
+      return;
+    }
+
     setLoading(true);
     try {
-      // 1. Try dedicated bulk sync endpoint first (atomic write to PostgreSQL)
-      try {
-        const syncRes = await storiesApi.sync(activeStories);
-        if (syncRes && typeof syncRes.count === "number") {
-          if (typeof window !== "undefined" && "BroadcastChannel" in window) {
-            try {
-              const ch = new BroadcastChannel("unihelp_stories_channel");
-              ch.postMessage({ type: "STORIES_UPDATED", stories: activeStories });
-              ch.close();
-            } catch (_e) {}
-          }
-          alert(`🎉 Successfully synchronized ${syncRes.count} success stories to live PostgreSQL database! All visitors worldwide can now view these live entries immediately.`);
-          return;
-        }
-      } catch (bulkErr) {
-        console.warn("Bulk sync endpoint notice, attempting individual upsert:", bulkErr);
-      }
-
-      // 2. Sequential fallback if bulk endpoint is unavailable
-      let successCount = 0;
-      let lastError = "";
-      for (const story of activeStories) {
-        try {
-          await storiesApi.create({
-            id: story.id,
-            name: story.name,
-            city: story.city,
-            stream: story.stream,
-            review: story.review,
-            rating: story.rating,
-            clientPic: story.clientPic,
-            visaStamp: story.visaStamp,
-            maskedName: story.maskedName,
-            stampId: story.stampId,
-            visaGrantDate: story.visaGrantDate,
-            isPublished: true,
-          });
-          successCount++;
-        } catch (err: any) {
-          lastError = err.message || "Network error";
-          console.error(`Failed to sync story ${story.id}:`, err);
-        }
-      }
+      // 2. Call exactly POST /api/stories/sync with Authorization: Bearer <admin_token>
+      const syncRes = await storiesApi.sync(activeStories);
 
       if (typeof window !== "undefined" && "BroadcastChannel" in window) {
         try {
@@ -1183,13 +1151,27 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
         } catch (_e) {}
       }
 
-      if (successCount > 0) {
-        alert(`🎉 Successfully synchronized ${successCount} of ${activeStories.length} success stories to live database!`);
+      const count = typeof syncRes?.count === "number" ? syncRes.count : activeStories.length;
+      alert(`🎉 Successfully synchronized ${count} success stories to live PostgreSQL database!`);
+    } catch (err: any) {
+      console.error("Sync error:", err);
+      const isAuthError =
+        err.code === "UNAUTHORIZED" ||
+        err.code === "INVALID_TOKEN" ||
+        err.code === "HTTP_401" ||
+        (typeof err.message === "string" && (
+          err.message.toLowerCase().includes("token") ||
+          err.message.toLowerCase().includes("authorization") ||
+          err.message.toLowerCase().includes("unauthorized")
+        ));
+
+      if (isAuthError) {
+        setAuthToken(null);
+        setIsAdminLoggedIn(false);
+        alert("Please log in again as an administrator.");
       } else {
-        alert(`Error syncing stories to live database: ${lastError || "Could not reach backend API"}. Please verify server connection.`);
+        alert(`Error syncing stories to live database: ${err.message || "Failed to synchronize stories"}`);
       }
-    } catch (e: any) {
-      alert(`Sync notice: ${e.message || "Synchronized local stories to memory."}`);
     } finally {
       setLoading(false);
     }

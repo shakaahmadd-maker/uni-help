@@ -38,8 +38,8 @@ export const storiesApi = {
     });
   },
 
-  async sync(stories: Partial<SuccessStoryRecord>[]): Promise<{ count: number; data: SuccessStoryRecord[] }> {
-    return apiRequest<{ count: number; data: SuccessStoryRecord[] }>("/api/stories/sync", {
+  async sync(stories: Partial<SuccessStoryRecord>[]): Promise<{ count: number; items?: SuccessStoryRecord[] }> {
+    return apiRequest<{ count: number; items?: SuccessStoryRecord[] }>("/api/stories/sync", {
       method: "POST",
       body: JSON.stringify({ stories }),
     });

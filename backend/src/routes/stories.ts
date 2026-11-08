@@ -1,5 +1,6 @@
 import { Router, Request, Response } from "express";
 import { prisma, getIsDatabaseConfigured } from "../db.js";
+import { requireAuth } from "../middleware/auth.js";
 import path from "path";
 import fs from "fs";
 
@@ -257,8 +258,8 @@ router.get("/", async (_req: Request, res: Response) => {
   }
 });
 
-// POST /api/stories/sync - Bulk force-sync success stories directly to PostgreSQL
-router.post("/sync", async (req: Request, res: Response) => {
+// POST /api/stories/sync - Bulk force-sync success stories directly to PostgreSQL (Admin protected)
+router.post("/sync", requireAuth, async (req: Request, res: Response) => {
   try {
     const rawStories = req.body?.stories || req.body || [];
     const storiesArray: any[] = Array.isArray(rawStories) ? rawStories : [rawStories];
@@ -325,8 +326,10 @@ router.post("/sync", async (req: Request, res: Response) => {
     console.log(`[Stories API] Bulk synced ${syncedRecords.length} stories successfully.`);
     return res.json({
       success: true,
-      count: syncedRecords.length,
-      data: syncedRecords,
+      data: {
+        count: syncedRecords.length,
+        items: syncedRecords,
+      },
     });
   } catch (error: any) {
     console.error("[Stories API] Sync failed:", error);
@@ -337,8 +340,8 @@ router.post("/sync", async (req: Request, res: Response) => {
   }
 });
 
-// POST /api/stories - Create or upsert a single success story
-router.post("/", async (req: Request, res: Response) => {
+// POST /api/stories - Create or upsert a single success story (Admin protected)
+router.post("/", requireAuth, async (req: Request, res: Response) => {
   try {
     const body = req.body || {};
     const targetId = body.id || `story-${Date.now()}`;
@@ -442,8 +445,8 @@ router.post("/", async (req: Request, res: Response) => {
   }
 });
 
-// PUT /api/stories/:id - Update existing success story
-router.put("/:id", async (req: Request, res: Response) => {
+// PUT /api/stories/:id - Update existing success story (Admin protected)
+router.put("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const body = req.body || {};
@@ -508,8 +511,8 @@ router.put("/:id", async (req: Request, res: Response) => {
   }
 });
 
-// DELETE /api/stories/:id - Delete story
-router.delete("/:id", async (req: Request, res: Response) => {
+// DELETE /api/stories/:id - Delete story (Admin protected)
+router.delete("/:id", requireAuth, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const isDb = getIsDatabaseConfigured();

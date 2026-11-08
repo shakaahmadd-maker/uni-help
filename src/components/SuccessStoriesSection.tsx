@@ -281,40 +281,6 @@ export default function SuccessStoriesSection({
               visaGrantDate: item.visaGrantDate || "",
             }));
 
-            // Auto-sync: Push any custom stories from local storage that are not yet on the server
-            let localStories: SuccessStory[] = [];
-            const stored = typeof window !== "undefined" ? localStorage.getItem("global_passages_v3_stories") : null;
-            if (stored) {
-              try {
-                localStories = JSON.parse(stored) as SuccessStory[];
-              } catch (_e) {}
-            }
-            const serverIds = new Set(mappedStories.map((s) => s.id));
-            const unsyncedStories = localStories.filter(
-              (s) => s && s.id && !serverIds.has(s.id)
-            );
-            if (unsyncedStories.length > 0) {
-              for (const unsynced of unsyncedStories) {
-                try {
-                  await storiesApi.create({
-                    id: unsynced.id,
-                    name: unsynced.name,
-                    city: unsynced.city,
-                    stream: unsynced.stream,
-                    review: unsynced.review,
-                    rating: unsynced.rating,
-                    clientPic: unsynced.clientPic,
-                    visaStamp: unsynced.visaStamp,
-                    maskedName: unsynced.maskedName,
-                    stampId: unsynced.stampId,
-                    visaGrantDate: unsynced.visaGrantDate,
-                    isPublished: true,
-                  });
-                  mappedStories.unshift(unsynced);
-                } catch (_e) {}
-              }
-            }
-
             const prevCount = lastBackendStories.current.length;
             lastBackendStories.current = mappedStories;
             handleLocalUpdate();
