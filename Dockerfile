@@ -1,31 +1,39 @@
 # Multi-stage Dockerfile for Uni Help Frontend (React + Vite + Tailwind CSS)
-# Stage 1: Build the static production bundle
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy package specifications and install dependencies
+# Copy dependency specifications and install all dependencies for build
 COPY package.json package-lock.json ./
 RUN npm ci
 
-# Copy project source files and compile Vite SPA
+# Copy application source code and compile production bundle into /app/dist
 COPY . .
 RUN npm run build
 
-# Stage 2: Production Web Server with Nginx
-FROM nginx:alpine
+# Stage 2: Production Lean Node.js Runtime (No Nginx/Caddy required)
+FROM node:22-alpine AS runner
 
-# Copy custom Nginx configuration (dual-listen on 80 & 3000 with SPA routing fallback)
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+WORKDIR /app
 
-# Copy compiled static assets from builder stage
-COPY --from=builder /app/dist /usr/share/nginx/html
+ENV NODE_ENV=production
+ENV PORT=3000
 
-# Expose both 80 and 3000 to eliminate Dokploy container port configuration mismatches
-EXPOSE 80 3000
+# Copy package definitions and install production dependencies
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
-# Health check to ensure Nginx is actively serving index.html
-HEALTHCHECK --interval=20s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
+# Copy compiled dist bundle and vite config from builder stage
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/vite.config.ts ./vite.config.ts
 
-CMD ["nginx", "-g", "daemon off;"]
+# Ensure files are owned by the node user
+RUN chown -R node:node /app
+
+USER node
+
+# Dokploy target port
+EXPOSE 3000
+
+# Runs continuously in foreground, serving dist on 0.0.0.0:3000
+CMD ["npm", "start"]
