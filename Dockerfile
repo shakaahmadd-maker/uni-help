@@ -1,60 +1,31 @@
-# Multi-stage Dockerfile for Uni Help Backend Node.js API
+# Multi-stage Dockerfile for Uni Help Frontend (React + Vite + Tailwind CSS)
+# Stage 1: Build the static production bundle
 FROM node:22-alpine AS builder
 
 WORKDIR /app
 
-# Copy dependency specifications and Prisma schema
+# Copy package specifications and install dependencies
 COPY package.json package-lock.json ./
-COPY prisma ./prisma/
-
-# Install all dependencies including devDependencies for build
 RUN npm ci
 
-# Copy application TypeScript source files
-COPY tsconfig.json ./
-COPY src ./src/
-
-# Generate Prisma Client for PostgreSQL
-RUN npx prisma generate
-
-# Compile TypeScript to JavaScript (dist/index.js)
+# Copy project source files and compile Vite SPA
+COPY . .
 RUN npm run build
 
-# Stage 2: Production Lean Runtime
-FROM node:22-alpine AS runner
+# Stage 2: Production Web Server with Nginx
+FROM nginx:alpine
 
-WORKDIR /app
+# Copy custom Nginx configuration (dual-listen on 80 & 3000 with SPA routing fallback)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-ENV NODE_ENV=production
-ENV PORT=3000
+# Copy compiled static assets from builder stage
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Install production dependencies only (includes prisma CLI for runtime migrations)
-COPY package.json package-lock.json ./
-COPY prisma ./prisma/
-COPY start.sh ./start.sh
-COPY entrypoint.sh ./entrypoint.sh
+# Expose both 80 and 3000 to eliminate Dokploy container port configuration mismatches
+EXPOSE 80 3000
 
-RUN npm ci --omit=dev
-RUN npx prisma generate
+# Health check to ensure Nginx is actively serving index.html
+HEALTHCHECK --interval=20s --timeout=3s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:80/ || wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
 
-# Sanitize Unix LF line endings and ensure executable permissions
-RUN tr -d '\r' < ./start.sh > ./start.sh.tmp && mv ./start.sh.tmp ./start.sh && chmod +x ./start.sh
-RUN tr -d '\r' < ./entrypoint.sh > ./entrypoint.sh.tmp && mv ./entrypoint.sh.tmp ./entrypoint.sh && chmod +x ./entrypoint.sh
-
-# Copy compiled JavaScript output from builder stage
-COPY --from=builder /app/dist ./dist
-
-# Ensure node user owns the application files
-RUN chown -R node:node /app
-
-# Non-root user for security
-USER node
-
-EXPOSE 3000
-
-# 15s start-period ensures container has time to deploy migrations before health check begins
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/api/health || exit 1
-
-ENTRYPOINT ["./entrypoint.sh"]
-CMD ["npm", "start"]
+CMD ["nginx", "-g", "daemon off;"]

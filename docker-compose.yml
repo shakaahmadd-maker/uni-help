@@ -41,7 +41,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: Dockerfile.frontend
+      dockerfile: Dockerfile
     container_name: unihelp_frontend
     restart: always
     depends_on:
