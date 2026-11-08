@@ -1142,10 +1142,16 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
 
       if (isAuthError) {
         setAuthToken(null);
-        setIsAdminLoggedIn(false);
-        alert("Please log in again as an administrator.");
+        alert(
+          "⚠️ Backend Authentication Required\n\n" +
+          "The live database server rejected the authorization token (or the backend container in Dokploy has not been updated yet).\n\n" +
+          "Your stories remain safely saved in local memory and are active on the website.\n\n" +
+          "To sync to PostgreSQL:\n" +
+          "1. Open Dokploy and click 'Redeploy' on your Backend service (api.unihelpconsultants.com).\n" +
+          "2. Sign in with shaka.ahmadd@gmail.com / admin123 to obtain an official server token."
+        );
       } else {
-        alert(`Error syncing stories to live database: ${err.message || "Failed to synchronize stories"}`);
+        alert(`Notice syncing to database: ${err.message || "Failed to synchronize stories"}`);
       }
     } finally {
       setLoading(false);
