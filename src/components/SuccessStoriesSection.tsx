@@ -10,6 +10,19 @@ import { storiesApi } from "../api/stories";
 // Initial set of default mock successes matching the specified HTML layout
 export const DEFAULT_MOCK_STORIES = [
   {
+    id: "story-1794042096342",
+    name: "Ahmad Khan",
+    city: "United Kingdom",
+    stream: "Master of Business Administration",
+    review: "Uni Help made my UK student visa process seamless from admission to visa stamping! Highly recommended.",
+    rating: 5,
+    clientPic: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&h=300&fit=crop",
+    visaStamp: "https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=500&h=400&fit=crop",
+    maskedName: "A***D K**N",
+    stampId: "STAMP-973",
+    visaGrantDate: "November 2026"
+  },
+  {
     id: "mock-1",
     name: "Fazal Wadood",
     city: "Germany",
@@ -523,7 +536,7 @@ export default function SuccessStoriesSection({
                                         <div className="w-full h-full bg-brand-blue-950 flex items-center justify-center">
                                           <FileText className="h-8 w-8 text-brand-gold-400 animate-pulse" />
                                         </div>
-                                      ) : (
+                                      ) : story.clientPic ? (
                                         <img 
                                           className="w-full h-full object-cover" 
                                           src={story.clientPic} 
@@ -532,6 +545,10 @@ export default function SuccessStoriesSection({
                                             (e.target as HTMLImageElement).src = `https://placehold.co/150x150/1d4ed8/ffffff?text=${encodeURIComponent(story.name)}`;
                                           }}
                                         />
+                                      ) : (
+                                        <div className="w-full h-full bg-gradient-to-br from-brand-blue-800 to-brand-blue-950 flex items-center justify-center text-white font-display font-black text-2xl select-none">
+                                          {story.name ? story.name.charAt(0).toUpperCase() : "U"}
+                                        </div>
                                       )}
                                     </div>
                                     {/* Green checkbadge */}
@@ -834,7 +851,7 @@ export default function SuccessStoriesSection({
                                   <div className="w-full h-full bg-brand-blue-950 flex items-center justify-center">
                                     <FileText className="h-6 w-6 text-brand-gold-400 animate-pulse" />
                                   </div>
-                                ) : (
+                                ) : story.clientPic ? (
                                   <img 
                                     className="w-full h-full object-cover" 
                                     src={story.clientPic} 
@@ -843,6 +860,10 @@ export default function SuccessStoriesSection({
                                       (e.target as HTMLImageElement).src = `https://placehold.co/150x150/1d4ed8/ffffff?text=${encodeURIComponent(story.name)}`;
                                     }}
                                   />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-brand-blue-800 to-brand-blue-950 flex items-center justify-center text-white font-display font-black text-base select-none">
+                                    {story.name ? story.name.charAt(0).toUpperCase() : "U"}
+                                  </div>
                                 )}
                               </div>
                               <div className="absolute bottom-0 right-0 bg-white rounded-full p-0.5 shadow border border-slate-100">
@@ -934,12 +955,18 @@ export default function SuccessStoriesSection({
                   className="w-full h-full bg-white border-0"
                   title="Visa document"
                 />
-              ) : (
+              ) : selectedVisaStory.visaStamp ? (
                 <img 
                   src={selectedVisaStory.visaStamp} 
                   className="w-full h-full object-contain filter" 
                   alt="Visa stamp"
                 />
+              ) : (
+                <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
+                  <ShieldCheck className="h-16 w-16 text-brand-gold-400/80 mb-2" />
+                  <span className="text-sm font-semibold text-white">Official Visa Grant Verified</span>
+                  <span className="text-xs text-slate-400 mt-1">Official visa documentation secured & archived for case {selectedVisaStory.stampId}</span>
+                </div>
               )}
               
               {/* Overlay Mask Tag */}

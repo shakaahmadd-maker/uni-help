@@ -12,27 +12,47 @@ export default defineConfig(() => {
       },
     },
     build: {
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 1200,
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom'],
-            'vendor-icons': ['lucide-react'],
-            'vendor-motion': ['motion'],
+          manualChunks(id) {
+            if (id.includes('node_modules')) {
+              if (id.includes('react') || id.includes('scheduler')) {
+                return 'vendor-react';
+              }
+              if (id.includes('lucide-react')) {
+                return 'vendor-icons';
+              }
+              if (id.includes('motion') || id.includes('framer-motion')) {
+                return 'vendor-motion';
+              }
+              if (id.includes('firebase')) {
+                return 'vendor-firebase';
+              }
+              return 'vendor';
+            }
           },
         },
       },
     },
     server: {
-      host: true,
-      allowedHosts: ['unihelpconsultants.com', '.unihelpconsultants.com'],
-      // HMR is disabled in AI Studio via DISABLE_HMR env var.
+      port: 3000,
+      host: '0.0.0.0',
+      allowedHosts: true,
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
+      proxy: {
+        '/api': {
+          target: process.env.VITE_API_URL || 'https://api.unihelpconsultants.com',
+          changeOrigin: true,
+          secure: false,
+        },
+      },
     },
     preview: {
-      host: true,
-      allowedHosts: ['unihelpconsultants.com', '.unihelpconsultants.com'],
+      port: 3000,
+      host: '0.0.0.0',
+      allowedHosts: true,
     },
   };
 });

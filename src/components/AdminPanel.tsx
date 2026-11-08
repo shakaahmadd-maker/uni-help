@@ -1910,13 +1910,17 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                                 <div className="h-10 w-10 rounded-lg bg-indigo-950/40 border border-slate-800 flex items-center justify-center shrink-0">
                                   <FileText className="h-5 w-5 text-indigo-400" />
                                 </div>
-                              ) : (
+                              ) : story.clientPic ? (
                                 <img
                                   src={story.clientPic}
                                   alt={story.name}
                                   className="h-10 w-10 rounded-lg object-cover border border-slate-800 shrink-0"
                                   referrerPolicy="no-referrer"
                                 />
+                              ) : (
+                                <div className="h-10 w-10 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-white font-bold text-xs shrink-0 select-none">
+                                  {story.name ? story.name.charAt(0).toUpperCase() : "U"}
+                                </div>
                               )}
                               <div className="min-w-0">
                                 <span className="font-bold text-white text-xs block truncate">{story.name}</span>
