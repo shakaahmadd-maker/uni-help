@@ -335,7 +335,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     if (found) {
       setCurrentUserEmail(found.email);
       setIsAdminLoggedIn(true);
-      setIsSandboxMode(false);
+      setIsSandboxMode(true);
       setLoginEmail("");
       setLoginPassword("");
     } else {
@@ -1102,8 +1102,14 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     // 1. Verify admin token exists before initiating sync
     const token = getAuthToken();
     if (!token) {
-      alert("Please log in again as an administrator.");
-      setIsAdminLoggedIn(false);
+      alert(
+        "⚠️ Live Database Authorization Token Required\n\n" +
+        "You are currently signed in with local offline credentials because the live Dokploy backend (api.unihelpconsultants.com) has not yet registered your admin account.\n\n" +
+        "Your stories are already saved and working in this browser session.\n\n" +
+        "To sync to PostgreSQL:\n" +
+        "1. Open Dokploy and click 'Redeploy' on the Backend service.\n" +
+        "2. Once deployed, log in here with shaka.ahmadd@gmail.com / admin123 to receive an official database authorization token."
+      );
       return;
     }
 
@@ -1368,15 +1374,17 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
               {/* Database & Account Connection Info Indicator */}
               <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 flex flex-wrap gap-4 items-center justify-between text-xs text-slate-300">
                 <div className="flex items-center gap-2.5">
-                  <div className={`p-1.5 rounded ${isSandboxMode ? "bg-slate-800 text-amber-500 border border-amber-500/10" : "bg-emerald-500/15 text-emerald-400"}`}>
+                  <div className={`p-1.5 rounded ${!getAuthToken() ? "bg-slate-800 text-amber-500 border border-amber-500/20" : "bg-emerald-500/15 text-emerald-400"}`}>
                     <Database className="h-4 w-4" />
                   </div>
                   <div>
                     <span className="font-semibold text-white">
-                      Data Pipeline: {isSandboxMode ? "💾 Local Cache" : "🚀 Live Database & Real-Time Sync"}
+                      Data Pipeline: {getAuthToken() ? "🚀 Live PostgreSQL Database" : "⚠️ Local Offline Mode (No Server Token)"}
                     </span>
                     <span className="text-slate-400 block text-[10px] mt-0.5">
-                      {isSandboxMode ? "Editing affects local session" : "Writing live entries immediately without restrictions"}
+                      {getAuthToken()
+                        ? "Active backend authorization token — sync and changes persist to PostgreSQL"
+                        : "Operating locally. Redeploy backend in Dokploy to register admin and enable live database sync."}
                     </span>
                   </div>
                 </div>
