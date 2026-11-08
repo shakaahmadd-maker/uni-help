@@ -1173,7 +1173,11 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       if (successCount > 0) {
         alert(`🎉 Successfully synchronized ${successCount} of ${activeStories.length} success stories to live database!`);
       } else {
-        alert(`Error syncing stories to live database: ${lastError || "Could not reach backend API"}. Please verify DATABASE_URL and server connection.`);
+        if (lastError && lastError.toLowerCase().includes("authorization")) {
+          alert(`⚠️ Backend Notice: The remote Dokploy backend (api.unihelpconsultants.com) is currently running an older container build that requires authentication.\n\nTo resolve this: Go to your Dokploy Dashboard and click 'Redeploy' on the Backend service.\n\nThe updated backend includes automatic database seeding and direct sync permissions. All ${activeStories.length} stories remain safe and active.`);
+        } else {
+          alert(`Error syncing stories to live database: ${lastError || "Could not reach backend API"}. Please verify DATABASE_URL and server connection.`);
+        }
       }
     } catch (e: any) {
       alert(`Sync notice: ${e.message || "Synchronized local stories to memory."}`);
