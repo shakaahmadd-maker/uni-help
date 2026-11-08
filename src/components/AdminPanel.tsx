@@ -7,6 +7,7 @@ import {
 import { authApi } from "../api/auth";
 import { submissionsApi } from "../api/submissions";
 import { storiesApi } from "../api/stories";
+import { healthApi } from "../api/health";
 import { SuccessStory, DEFAULT_MOCK_STORIES } from "./SuccessStoriesSection";
 
 interface Submission {
@@ -474,8 +475,20 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     window.dispatchEvent(new Event("localStoriesUpdated"));
   };
 
-  // Check existing PostgreSQL session on mount
+  // Check backend health and existing session on mount
   useEffect(() => {
+    // Check backend health status (status === "ok" indicates backend availability)
+    healthApi.check()
+      .then((health) => {
+        if (health && health.status === "ok") {
+          setDbStatus("ACTIVE");
+          setErrorLogs(null);
+        }
+      })
+      .catch((err) => {
+        console.warn("Backend health probe notice:", err?.message || err);
+      });
+
     authApi.getCurrentUser()
       .then((user) => {
         if (user && user.email) {
@@ -1173,11 +1186,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       if (successCount > 0) {
         alert(`🎉 Successfully synchronized ${successCount} of ${activeStories.length} success stories to live database!`);
       } else {
-        if (lastError && lastError.toLowerCase().includes("authorization")) {
-          alert(`⚠️ Backend Notice: The remote Dokploy backend (api.unihelpconsultants.com) is currently running an older container build that requires authentication.\n\nTo resolve this: Go to your Dokploy Dashboard and click 'Redeploy' on the Backend service.\n\nThe updated backend includes automatic database seeding and direct sync permissions. All ${activeStories.length} stories remain safe and active.`);
-        } else {
-          alert(`Error syncing stories to live database: ${lastError || "Could not reach backend API"}. Please verify DATABASE_URL and server connection.`);
-        }
+        alert(`Error syncing stories to live database: ${lastError || "Could not reach backend API"}. Please verify server connection.`);
       }
     } catch (e: any) {
       alert(`Sync notice: ${e.message || "Synchronized local stories to memory."}`);
