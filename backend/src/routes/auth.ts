@@ -12,9 +12,28 @@ router.post("/login", validateBody(loginSchema), async (req: Request, res: Respo
     const { email, password } = req.body;
     const emailLower = email.toLowerCase().trim();
 
-    const user = await prisma.user.findUnique({
+    let user = await prisma.user.findUnique({
       where: { email: emailLower },
     });
+
+    // Auto-bootstrap master admin accounts if not yet created in PostgreSQL
+    if (!user && (emailLower === "admin@unihelp.com" || emailLower === "shaka.ahmadd@gmail.com") && password === "admin123") {
+      try {
+        const passwordHash = await bcrypt.hash("admin123", 10);
+        user = await prisma.user.create({
+          data: {
+            email: emailLower,
+            name: emailLower === "shaka.ahmadd@gmail.com" ? "Shaka Ahmad" : "Uni Help Super Admin",
+            role: "SUPER_ADMIN" as any,
+            passwordHash,
+            isActive: true,
+          },
+        });
+        console.log(`[Auth API] Auto-bootstrapped master admin: ${emailLower}`);
+      } catch (seedErr) {
+        console.warn("[Auth API] Could not auto-bootstrap admin:", seedErr);
+      }
+    }
 
     if (!user || !user.isActive) {
       return res.status(401).json({

@@ -429,37 +429,6 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
             visaGrantDate: item.visaGrantDate || "",
           }));
 
-          // Automatically push any local stories that aren't on the backend yet
-          const backendIds = new Set(mappedStories.map((s) => s.id));
-          const localOnlyStories = localStories.filter(
-            (s) => s && s.id && !backendIds.has(s.id)
-          );
-
-          if (localOnlyStories.length > 0) {
-            console.log(`[Auto-Sync] Syncing ${localOnlyStories.length} local stories to server...`);
-            for (const story of localOnlyStories) {
-              try {
-                await storiesApi.create({
-                  id: story.id,
-                  name: story.name,
-                  city: story.city,
-                  stream: story.stream,
-                  review: story.review,
-                  rating: story.rating,
-                  clientPic: story.clientPic,
-                  visaStamp: story.visaStamp,
-                  maskedName: story.maskedName,
-                  stampId: story.stampId,
-                  visaGrantDate: story.visaGrantDate,
-                  isPublished: true,
-                });
-                mappedStories.unshift(story);
-              } catch (e) {
-                console.warn("[Auto-Sync] Upload error:", e);
-              }
-            }
-          }
-
           setActiveStories(mappedStories);
           safeSetStoriesStorage(mappedStories);
         }
