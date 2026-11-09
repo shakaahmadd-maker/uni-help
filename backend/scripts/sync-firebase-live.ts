@@ -184,7 +184,7 @@ async function runDirectSync() {
       else if (r.includes("OPERATIONS")) role = Role.OPERATIONS_LEAD;
       else if (r.includes("COUNSELOR")) role = Role.COUNSELOR;
 
-      const rawPass = data.password || "admin123";
+      const rawPass = data.password || process.env.ADMIN_INITIAL_PASSWORD || "ChangeMeSecurely123!";
       const passwordHash = await bcrypt.hash(rawPass, 10);
 
       if (!isDryRun) {

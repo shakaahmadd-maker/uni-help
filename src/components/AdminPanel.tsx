@@ -136,33 +136,10 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     }
     if (localList.length === 0) {
       localList = [
-        { email: "admin@unihelp.com", password: "admin123", createdAt: new Date().toISOString(), role: "Super Admin" },
-        { email: "shaka.ahmadd@gmail.com", password: "admin123", createdAt: new Date().toISOString(), role: "Super Admin" }
+        { email: "admin@unihelp.com", password: "••••••••", createdAt: new Date().toISOString(), role: "Super Admin" },
+        { email: "shaka.ahmadd@gmail.com", password: "••••••••", createdAt: new Date().toISOString(), role: "Super Admin" }
       ];
       localStorage.setItem("unihelp_admin_credentials", JSON.stringify(localList));
-    } else {
-      let changed = false;
-      if (!localList.some(c => c.email.toLowerCase() === "admin@unihelp.com")) {
-        localList.push({
-          email: "admin@unihelp.com",
-          password: "admin123",
-          createdAt: new Date().toISOString(),
-          role: "Super Admin"
-        });
-        changed = true;
-      }
-      if (!localList.some(c => c.email.toLowerCase() === "shaka.ahmadd@gmail.com")) {
-        localList.push({
-          email: "shaka.ahmadd@gmail.com",
-          password: "admin123",
-          createdAt: new Date().toISOString(),
-          role: "Super Admin"
-        });
-        changed = true;
-      }
-      if (changed) {
-        localStorage.setItem("unihelp_admin_credentials", JSON.stringify(localList));
-      }
     }
     
     // 2. Fetch live credentials list from self-hosted PostgreSQL backend API
@@ -315,31 +292,18 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     const emailLower = loginEmail.toLowerCase().trim();
 
     try {
-      // 1. Direct login to self-hosted Node.js + PostgreSQL backend API
+      // Direct live login to Node.js + PostgreSQL backend API
       const res = await authApi.login(emailLower, loginPassword);
       setCurrentUserEmail(res.user.email);
       setIsAdminLoggedIn(true);
       setIsSandboxMode(false);
       setLoginEmail("");
       setLoginPassword("");
-      return;
     } catch (apiErr: any) {
-      console.warn("Backend API login returned error, checking local credentials fallback:", apiErr);
-    }
-
-    // 2. Local fallback check (for offline/sandbox development)
-    const found = adminCredentials.find(
-      (cred) => cred.email.toLowerCase() === emailLower && (cred.password === loginPassword || loginPassword === "admin123")
-    );
-
-    if (found) {
-      setCurrentUserEmail(found.email);
-      setIsAdminLoggedIn(true);
-      setIsSandboxMode(true);
-      setLoginEmail("");
-      setLoginPassword("");
-    } else {
-      setLoginError("Invalid admin email or password credentials. Please verify and try again.");
+      console.warn("Backend API login error:", apiErr);
+      const errMsg = apiErr?.message || "Invalid email or password. Please verify your credentials or run the admin seed command.";
+      setLoginError(errMsg);
+      setIsAdminLoggedIn(false);
     }
   };
   
@@ -586,7 +550,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
   // Auth Functions
   const handleGoogleLogin = async () => {
     // Self-hosted PostgreSQL Admin Login recommendation
-    alert("On your self-hosted VPS, please sign in using the Email & Password credentials tab. Default: admin@unihelp.com / admin123");
+    alert("Please sign in using your administrator email and password configured in PostgreSQL via the admin seed script.");
   };
 
   const handleLogout = async () => {
@@ -1102,14 +1066,9 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     // 1. Verify admin token exists before initiating sync
     const token = getAuthToken();
     if (!token) {
-      alert(
-        "⚠️ Live Database Authorization Token Required\n\n" +
-        "You are currently signed in with local offline credentials because the live Dokploy backend (api.unihelpconsultants.com) has not yet registered your admin account.\n\n" +
-        "Your stories are already saved and working in this browser session.\n\n" +
-        "To sync to PostgreSQL:\n" +
-        "1. Open Dokploy and click 'Redeploy' on the Backend service.\n" +
-        "2. Once deployed, log in here with shaka.ahmadd@gmail.com / admin123 to receive an official database authorization token."
-      );
+      setIsAdminLoggedIn(false);
+      setLoginError("Administrator session token is missing or expired. Please sign in to authenticate with the database.");
+      alert("Administrator authorization token required. Please sign in with your administrator credentials.");
       return;
     }
 
@@ -1133,25 +1092,23 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
       const isAuthError =
         err.code === "UNAUTHORIZED" ||
         err.code === "INVALID_TOKEN" ||
+        err.code === "FORBIDDEN" ||
         err.code === "HTTP_401" ||
+        err.code === "HTTP_403" ||
         (typeof err.message === "string" && (
           err.message.toLowerCase().includes("token") ||
           err.message.toLowerCase().includes("authorization") ||
-          err.message.toLowerCase().includes("unauthorized")
+          err.message.toLowerCase().includes("unauthorized") ||
+          err.message.toLowerCase().includes("forbidden")
         ));
 
       if (isAuthError) {
         setAuthToken(null);
-        alert(
-          "⚠️ Backend Authentication Required\n\n" +
-          "The live database server rejected the authorization token (or the backend container in Dokploy has not been updated yet).\n\n" +
-          "Your stories remain safely saved in local memory and are active on the website.\n\n" +
-          "To sync to PostgreSQL:\n" +
-          "1. Open Dokploy and click 'Redeploy' on your Backend service (api.unihelpconsultants.com).\n" +
-          "2. Sign in with shaka.ahmadd@gmail.com / admin123 to obtain an official server token."
-        );
+        setIsAdminLoggedIn(false);
+        setLoginError("Your administrator session has expired or is unauthorized. Please sign in again.");
+        alert("Session expired or unauthorized. Please log in again as an administrator.");
       } else {
-        alert(`Notice syncing to database: ${err.message || "Failed to synchronize stories"}`);
+        alert(`Error syncing stories to live database: ${err.message || "Failed to synchronize stories"}`);
       }
     } finally {
       setLoading(false);

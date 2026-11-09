@@ -99,42 +99,32 @@ const INITIAL_STORIES = [
 async function main() {
   console.log("Seeding PostgreSQL database...");
 
-  // 1. Seed Super Admins
-  const defaultPassword = process.env.ADMIN_INITIAL_PASSWORD || "admin123";
-  const passwordHash = await bcrypt.hash(defaultPassword, 10);
+  // 1. Seed Administrator if runtime environment variables are provided
+  const adminEmail = process.env.ADMIN_EMAIL?.toLowerCase().trim();
+  const adminPassword = process.env.ADMIN_INITIAL_PASSWORD;
 
-  const admins = [
-    {
-      email: "admin@unihelp.com",
-      name: "Uni Help Super Admin",
-      role: Role.SUPER_ADMIN,
-    },
-    {
-      email: "shaka.ahmadd@gmail.com",
-      name: "Shaka Ahmad",
-      role: Role.SUPER_ADMIN,
-    }
-  ];
+  if (adminEmail && adminPassword && adminPassword.length >= 8) {
+    const passwordHash = await bcrypt.hash(adminPassword, 12);
+    const targetRole = ("ADMIN" in Role) ? (Role as any).ADMIN : Role.SUPER_ADMIN;
 
-  for (const admin of admins) {
-    const existing = await prisma.user.findUnique({
-      where: { email: admin.email.toLowerCase() },
+    const adminUser = await prisma.user.upsert({
+      where: { email: adminEmail },
+      update: {
+        passwordHash,
+        role: targetRole,
+        isActive: true,
+      },
+      create: {
+        email: adminEmail,
+        name: process.env.ADMIN_NAME?.trim() || "Administrator",
+        role: targetRole,
+        passwordHash,
+        isActive: true,
+      },
     });
-
-    if (!existing) {
-      await prisma.user.create({
-        data: {
-          email: admin.email.toLowerCase(),
-          name: admin.name,
-          role: admin.role,
-          passwordHash,
-          isActive: true,
-        },
-      });
-      console.log(`Created admin account: ${admin.email}`);
-    } else {
-      console.log(`Admin account already exists: ${admin.email}`);
-    }
+    console.log(`[Seed] Administrator account provisioned: ${adminUser.email} (Role: ${adminUser.role})`);
+  } else {
+    console.log("[Seed] Skipping admin auto-seed (ADMIN_EMAIL or ADMIN_INITIAL_PASSWORD not configured). Use 'npm run db:seed:admin' to configure.");
   }
 
   // 2. Seed Initial Success Stories

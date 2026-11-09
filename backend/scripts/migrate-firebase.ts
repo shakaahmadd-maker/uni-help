@@ -181,7 +181,7 @@ async function migrateAdmins() {
     else if (item.role?.toUpperCase().includes("OPERATIONS")) role = Role.OPERATIONS_LEAD;
     else if (item.role?.toUpperCase().includes("COUNSELOR")) role = Role.COUNSELOR;
 
-    const rawPassword = item.password || "admin123";
+    const rawPassword = item.password || process.env.ADMIN_INITIAL_PASSWORD || "ChangeMeSecurely123!";
     const passwordHash = await bcrypt.hash(rawPassword, 10);
 
     if (!isDryRun) {
