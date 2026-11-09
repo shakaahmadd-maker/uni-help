@@ -1,7 +1,18 @@
 // Uni Help API Client - Configurable for Self-Hosted Node.js + PostgreSQL Backend
-const API_BASE = import.meta.env.VITE_API_URL 
-  ? import.meta.env.VITE_API_URL.replace(/\/$/, "") 
-  : "";
+export function getApiBase(): string {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL.replace(/\/$/, "");
+  }
+  if (typeof window !== "undefined") {
+    const host = (window.location.hostname || "").toLowerCase();
+    if (host === "unihelpconsultants.com" || host === "www.unihelpconsultants.com") {
+      return "https://api.unihelpconsultants.com";
+    }
+  }
+  return "";
+}
+
+const API_BASE = getApiBase();
 
 export interface ApiResponse<T = any> {
   success: boolean;

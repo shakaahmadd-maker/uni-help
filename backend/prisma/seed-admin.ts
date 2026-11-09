@@ -64,7 +64,7 @@ async function main() {
   const passwordHash = await bcrypt.hash(rawPassword, 12);
 
   // 4. Determine target role (prefer Role.ADMIN, with fallback to Role.SUPER_ADMIN if enum restricted)
-  const targetRole = ("ADMIN" in Role) ? (Role as any).ADMIN : Role.SUPER_ADMIN;
+  const targetRole: Role = (Role as any).ADMIN ?? (Role as any).SUPER_ADMIN;
 
   // 5. Idempotent Upsert (Safe to run multiple times without duplicate key errors or resetting database)
   const user = await prisma.user.upsert({

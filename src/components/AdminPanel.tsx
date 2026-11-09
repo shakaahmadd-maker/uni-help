@@ -350,7 +350,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
   const hasFirstAndLastName = storyName.trim().split(/\s+/).filter(Boolean).length >= 2;
   const isCountrySelected = storyCountry !== "";
   const isProgramValid = storyStream.trim().length >= 4;
-  const isVisaDateValid = storyVisaGrantDate.trim().length >= 4;
+  const isVisaDateValid = storyVisaGrantDate.trim().length === 0 || storyVisaGrantDate.trim().length >= 3;
   const isTestimonialValid = storyReview.trim().length >= 20;
 
   // Maximum recommended RAW size limit: 15MB
@@ -802,18 +802,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
     setStoryStream(story.stream);
     setStoryVisaGrantDate(story.visaGrantDate || "");
     
-    // Isolate custom text if compiled with pre-integrated messages or let user edit completely
-    let customPart = story.review;
-    const splitStr = "At @unihelp, we specialize in turning study abroad dreams into reality. ";
-    const altSplitStr = "At @unihelp, our admissions desk simplifies study visa guidelines. Ready to take your career global?";
-    
-    if (story.review.includes(splitStr)) {
-      customPart = story.review.split(splitStr)[1] || story.review;
-    } else if (story.review.includes(altSplitStr)) {
-      customPart = story.review.split(altSplitStr)[1] || story.review;
-    }
-    
-    setStoryReview(customPart.trim());
+    setStoryReview(story.review.trim());
     setStoryRating(story.rating);
     setStoryPicBase64(story.clientPic);
     setStoryStampBase64(story.visaStamp);
@@ -1471,6 +1460,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                             className="w-full bg-slate-955 border border-slate-800/80 px-3 py-2 text-xs text-white rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-gold-500"
                           >
                             <option value="">Select target country...</option>
+                            <option value="Visa Approved">Visa Approved</option>
                             <option value="Germany">Germany</option>
                             <option value="United Kingdom">United Kingdom</option>
                             <option value="Australia">Australia</option>
@@ -1648,7 +1638,24 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                                 )}
                                 <div className="text-[11px] font-bold text-white uppercase tracking-wider">Student Portrait</div>
                                 <div className="text-[10px] text-brand-gold-400 truncate max-w-full italic px-2 font-semibold">
-                                  {storyPicFileName} <span className="text-[9px] text-slate-400 font-normal">(Click to replace)</span>
+                                  {storyPicFileName}
+                                </div>
+                                <div className="flex items-center justify-center gap-2 mt-0.5">
+                                  <span className="text-[9px] text-slate-400 font-normal hover:text-white">(Click to replace)</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setStoryPicBase64(null);
+                                      setStoryPicFileName("");
+                                      setStoryPicRawSize(null);
+                                      setStoryPicCompSize(null);
+                                    }}
+                                    className="text-[9px] text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer"
+                                  >
+                                    Remove
+                                  </button>
                                 </div>
                               </div>
                             ) : (
@@ -1678,13 +1685,13 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                               </div>
                             ) : (
                               <div className="text-[8.5px] text-slate-500 mt-2 font-mono">
-                                Limit: 5 MB | Max Recommended: 2 MB
+                                Limit: 15 MB | Recommended: &lt; 2 MB
                               </div>
                             )}
                           </label>
                           {!isPicSizeOk && (
                             <span className="text-[8px] text-rose-400 uppercase font-bold tracking-wider mt-1 block">
-                              ⚠️ File exceeds 5MB size limit!
+                              ⚠️ File exceeds 15MB size limit!
                             </span>
                           )}
                         </div>
@@ -1715,7 +1722,24 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                                 )}
                                 <div className="text-[11px] font-bold text-white uppercase tracking-wider">Visa Approved Stamp</div>
                                 <div className="text-[10px] text-emerald-400 truncate max-w-full italic px-2 font-semibold">
-                                  {storyStampFileName} <span className="text-[9px] text-slate-400 font-normal">(Click to replace)</span>
+                                  {storyStampFileName}
+                                </div>
+                                <div className="flex items-center justify-center gap-2 mt-0.5">
+                                  <span className="text-[9px] text-slate-400 font-normal hover:text-white">(Click to replace)</span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      setStoryStampBase64(null);
+                                      setStoryStampFileName("");
+                                      setStoryStampRawSize(null);
+                                      setStoryStampCompSize(null);
+                                    }}
+                                    className="text-[9px] text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer"
+                                  >
+                                    Remove
+                                  </button>
                                 </div>
                               </div>
                             ) : (
