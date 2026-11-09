@@ -127,18 +127,42 @@ async function main() {
     console.log("[Seed] Skipping admin auto-seed (ADMIN_EMAIL or ADMIN_INITIAL_PASSWORD not configured). Use 'npm run db:seed:admin' to configure.");
   }
 
-  // 2. Seed Initial Success Stories
+  // 2. Seed Initial Success Stories (Idempotent upsert)
   for (const story of INITIAL_STORIES) {
-    const existingStory = await prisma.successStory.findUnique({
+    const record = await prisma.successStory.upsert({
       where: { legacyId: story.legacyId },
+      update: {
+        name: story.name,
+        maskedName: story.maskedName,
+        city: story.city,
+        stream: story.stream,
+        review: story.review,
+        rating: story.rating,
+        clientPic: story.clientPic,
+        visaStamp: story.visaStamp,
+        stampId: story.stampId,
+        visaGrantDate: story.visaGrantDate,
+        isPublished: story.isPublished,
+        displayOrder: story.displayOrder,
+      },
+      create: {
+        id: story.legacyId,
+        legacyId: story.legacyId,
+        name: story.name,
+        maskedName: story.maskedName,
+        city: story.city,
+        stream: story.stream,
+        review: story.review,
+        rating: story.rating,
+        clientPic: story.clientPic,
+        visaStamp: story.visaStamp,
+        stampId: story.stampId,
+        visaGrantDate: story.visaGrantDate,
+        isPublished: story.isPublished,
+        displayOrder: story.displayOrder,
+      },
     });
-
-    if (!existingStory) {
-      await prisma.successStory.create({
-        data: story,
-      });
-      console.log(`Created success story: ${story.name} (${story.city})`);
-    }
+    console.log(`[Seed] Success story verified: ${record.name} (${record.city}) [${record.id}]`);
   }
 
   console.log("Database seeding completed successfully!");
