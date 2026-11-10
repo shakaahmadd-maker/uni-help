@@ -185,8 +185,11 @@ export default function SuccessStoriesSection({
     };
 
     const fetchBackendStories = () => {
-      storiesApi
-        .getAll()
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Stories fetch timeout")), 3500)
+      );
+
+      Promise.race([storiesApi.getAll(), timeoutPromise])
         .then(async (backendStories) => {
           if (backendStories && backendStories.length > 0) {
             const mappedStories: SuccessStory[] = backendStories.map((item) => ({
@@ -216,6 +219,7 @@ export default function SuccessStoriesSection({
           }
         })
         .catch((_err) => {
+          // Gracefully fall back to local/cached stories on timeout or error
           handleLocalUpdate();
         });
     };
@@ -429,6 +433,9 @@ export default function SuccessStoriesSection({
                                           className="w-full h-full object-cover" 
                                           src={story.clientPic} 
                                           alt={story.name} 
+                                          loading="lazy"
+                                          decoding="async"
+                                          referrerPolicy="no-referrer"
                                           onError={(e) => {
                                             (e.target as HTMLImageElement).src = `https://placehold.co/150x150/1d4ed8/ffffff?text=${encodeURIComponent(story.name)}`;
                                           }}
@@ -510,8 +517,21 @@ export default function SuccessStoriesSection({
                       </AnimatePresence>
                     </div>
                   ) : (
-                    <div className="text-center py-16 bg-brand-blue-900 rounded-3xl border border-brand-blue-800 text-slate-300">
-                      No success stories are configured.
+                    <div className="w-full bg-white text-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl border border-slate-100 relative animate-pulse select-none min-h-[340px]">
+                      <div className="absolute top-5 right-5 h-6 w-24 bg-slate-200 rounded-full" />
+                      <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
+                        <div className="w-28 h-32 rounded-[50%/40%] bg-slate-200 shrink-0" />
+                        <div className="flex-1 w-full space-y-3 text-center md:text-left">
+                          <div className="h-7 w-48 bg-slate-200 rounded-lg mx-auto md:mx-0" />
+                          <div className="h-4 w-36 bg-slate-200 rounded mx-auto md:mx-0" />
+                          <div className="h-20 w-full bg-slate-100 rounded-2xl mt-4" />
+                        </div>
+                      </div>
+                      <hr className="border-slate-100 my-6" />
+                      <div className="flex justify-between items-center">
+                        <div className="h-10 w-44 bg-slate-200 rounded-xl" />
+                        <div className="h-4 w-28 bg-slate-200 rounded" />
+                      </div>
                     </div>
                   )}
 
@@ -744,6 +764,9 @@ export default function SuccessStoriesSection({
                                     className="w-full h-full object-cover" 
                                     src={story.clientPic} 
                                     alt={story.name} 
+                                    loading="lazy"
+                                    decoding="async"
+                                    referrerPolicy="no-referrer"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src = `https://placehold.co/150x150/1d4ed8/ffffff?text=${encodeURIComponent(story.name)}`;
                                     }}
@@ -848,6 +871,9 @@ export default function SuccessStoriesSection({
                   src={selectedVisaStory.visaStamp} 
                   className="w-full h-full object-contain filter" 
                   alt="Visa stamp"
+                  loading="lazy"
+                  decoding="async"
+                  referrerPolicy="no-referrer"
                 />
               ) : (
                 <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">

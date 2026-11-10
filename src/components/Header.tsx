@@ -165,6 +165,9 @@ export default function Header({
                 src="/logo.png"
                 alt="Uni Help Consultants Logo"
                 className="h-7 sm:h-9 w-auto object-contain transition-transform duration-300 group-hover:scale-103"
+                loading="eager"
+                fetchPriority="high"
+                decoding="sync"
                 referrerPolicy="no-referrer"
               />
             </div>

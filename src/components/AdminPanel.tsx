@@ -1633,7 +1633,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                                   </div>
                                 ) : (
                                   <div className="mx-auto h-12 w-12 rounded-full overflow-hidden border-2 border-brand-gold-400/50 shadow-md">
-                                    <img src={storyPicBase64} className="h-full w-full object-cover" alt="Student Portrait" referrerPolicy="no-referrer" />
+                                    <img src={storyPicBase64} className="h-full w-full object-cover" alt="Student Portrait" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
                                   </div>
                                 )}
                                 <div className="text-[11px] font-bold text-white uppercase tracking-wider">Student Portrait</div>
@@ -1717,7 +1717,7 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                                   </div>
                                 ) : (
                                   <div className="mx-auto h-12 w-16 rounded-lg overflow-hidden border border-emerald-500/40 shadow-md">
-                                    <img src={storyStampBase64} className="h-full w-full object-contain bg-slate-900" alt="Visa Stamp" referrerPolicy="no-referrer" />
+                                    <img src={storyStampBase64} className="h-full w-full object-contain bg-slate-900" alt="Visa Stamp" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
                                   </div>
                                 )}
                                 <div className="text-[11px] font-bold text-white uppercase tracking-wider">Visa Approved Stamp</div>
@@ -1874,6 +1874,8 @@ export default function AdminPanel({ isOpen, onClose, isFullPage = false }: Admi
                                   src={story.clientPic}
                                   alt={story.name}
                                   className="h-10 w-10 rounded-lg object-cover border border-slate-800 shrink-0"
+                                  loading="lazy"
+                                  decoding="async"
                                   referrerPolicy="no-referrer"
                                 />
                               ) : (

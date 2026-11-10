@@ -468,6 +468,8 @@ export default function AboutSection({ onConsult }: AboutSectionProps) {
                 src="/src/assets/images/about_us_counseling_team_1793878050703.jpg" 
                 alt="Uni Help Consultants - Professional counseling team guiding university student" 
                 className="w-full h-full object-cover object-top group-hover:scale-[1.03] transition-transform duration-700 ease-out block"
+                loading="lazy"
+                decoding="async"
                 referrerPolicy="no-referrer"
                 onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1000&auto=format&fit=crop";
@@ -483,6 +485,8 @@ export default function AboutSection({ onConsult }: AboutSectionProps) {
                     src="https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=200&h=200&q=80" 
                     alt="Alumna student portrait Alisha K." 
                     className="object-cover w-full h-full"
+                    loading="lazy"
+                    decoding="async"
                     referrerPolicy="no-referrer"
                   />
                 </div>

@@ -151,6 +151,8 @@ export default function Footer({ onLinkClick, onCityLinkClick, currentPath, navi
                   src="/logo.png"
                   alt="Uni Help Consultants Logo"
                   className="h-9 sm:h-10 w-auto object-contain"
+                  loading="lazy"
+                  decoding="async"
                   referrerPolicy="no-referrer"
                 />
               </div>

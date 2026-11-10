@@ -687,6 +687,7 @@ router.get("/", async (_req: Request, res: Response) => {
       }
 
       if (stories && stories.length > 0) {
+        res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
         return res.json({
           success: true,
           data: stories,
@@ -695,6 +696,7 @@ router.get("/", async (_req: Request, res: Response) => {
     }
 
     const fallback = readFallbackStories();
+    res.setHeader("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
     return res.json({
       success: true,
       data: fallback,
@@ -702,6 +704,7 @@ router.get("/", async (_req: Request, res: Response) => {
   } catch (error: any) {
     console.warn("[Prisma Stories] Database query error, using fallback storage:", error.message);
     const fallback = readFallbackStories();
+    res.setHeader("Cache-Control", "public, max-age=30, stale-while-revalidate=120");
     return res.json({
       success: true,
       data: fallback,

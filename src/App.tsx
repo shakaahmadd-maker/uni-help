@@ -135,6 +135,8 @@ export default function App() {
   useEffect(() => {
     if (currentPath === "/success-stories") {
       setActiveSection("success-stories");
+    } else if (currentPath === "/comprehensive" || currentPath === "/360" || currentPath === "/comprehensive-support") {
+      setActiveSection("services");
     } else if (getCountryIdFromPath(currentPath) !== null) {
       setActiveSection("destinations");
     } else if (currentPath.startsWith("/immigration")) {
@@ -287,6 +289,14 @@ export default function App() {
               currentPath={currentPath}
               onNavigate={navigateTo}
               onConsult={handleServiceSelectPrefill}
+            />
+          </div>
+        ) : (currentPath === "/comprehensive" || currentPath === "/360" || currentPath === "/comprehensive-support") ? (
+          /* Separate Dedicated Comprehensive 360 Support View */
+          <div className="pt-20">
+            <ServicesSection 
+              onBookService={handleServiceSelectPrefill} 
+              onNavigate={navigateTo}
             />
           </div>
         ) : getServiceIdFromPath(currentPath) !== null ? (

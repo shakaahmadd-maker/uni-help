@@ -42,6 +42,15 @@ export const SERVICE_IMAGES: Record<string, string> = {
   "pre-departure": "/src/assets/images/service_pre_departure_1793878055021.jpg"
 };
 
+export const SERVICE_FALLBACK_IMAGES: Record<string, string> = {
+  "university-admissions": "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=800&auto=format&fit=crop",
+  "visa-guidance": "https://images.unsplash.com/photo-1544717305-2782549b5136?q=80&w=800&auto=format&fit=crop",
+  "scholarship-assistance": "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=800&auto=format&fit=crop",
+  "career-counseling": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=800&auto=format&fit=crop",
+  "test-prep": "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=800&auto=format&fit=crop",
+  "pre-departure": "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=800&auto=format&fit=crop"
+};
+
 const SERVICES_KPI_DATA: Record<string, { duration: string; cost: string; experience: string; englishReq: string; badge: string; overview: string }> = {
   "university-admissions": {
     duration: "2 - 8 Weeks",
@@ -391,6 +400,8 @@ export default function ServicesSection({
       badge: "Step 01 / Pre-Audit",
       iconName: "GraduationCap",
       color: "text-sky-500 bg-sky-500/10 border-sky-500/20",
+      image: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=900&auto=format&fit=crop",
+      alt: "Admissions profile assessment and university matching consultation",
       details: [
         "Unbiased matching across UK, USA, Canada, Australia & Europe",
         "Free initial eligibility audit conducted by senior counselors",
@@ -399,28 +410,32 @@ export default function ServicesSection({
       prefillInquiry: "360° Support Intake: Profile Assessment"
     },
     {
-      title: "Exam & Score Mastery",
+      title: "German A1-B2 & IELTS Prep",
       label: "Standardized Prep",
       description: "Custom strategies, material drills, and mock sessions to guarantee key linguistic proficiency benchmarks.",
-      metric: "Targeting Average Band 7.5+ IELTS",
+      metric: "Targeting Average Band 7.5+ IELTS & B2 German",
       badge: "Step 02 / Diagnostics",
       iconName: "BookOpen",
       color: "text-amber-400 bg-amber-500/10 border-amber-500/20",
+      image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?q=80&w=900&auto=format&fit=crop",
+      alt: "Student preparing for IELTS and German language proficiency examinations",
       details: [
-        "Diagnostic test prep for IELTS Academic, TOEFL, or Duolingo",
+        "Diagnostic test prep for IELTS Academic, German A1-B2, TOEFL, or Duolingo",
         "Personalized feedback sessions with senior language instructors",
         "Full simulation mocks with realistic timing and evaluation criteria"
       ],
       prefillInquiry: "360° Support Intake: Test Preparation"
     },
     {
-      title: "SOP & Essay Advisory",
+      title: "Document Attestation & SOP",
       label: "Dossier Polish",
       description: "Our board reviews, restructures, and polishes your statement of purpose to capture your core leadership potential.",
       metric: "100% Tailored Portfolios (No AI Templates)",
       badge: "Step 03 / Portfolio",
       iconName: "FileCheck",
       color: "text-indigo-500 bg-indigo-500/10 border-indigo-500/20",
+      image: "https://images.unsplash.com/photo-1455390582262-044cdead277a?q=80&w=900&auto=format&fit=crop",
+      alt: "Professional editing and polishing of Statement of Purpose and academic recommendations",
       details: [
         "Statement of Purpose (SOP) styling, structures and proofreading",
         "Helper tutorials to file custom CV and Letter of recommendation matrices",
@@ -436,6 +451,8 @@ export default function ServicesSection({
       badge: "Step 04 / Funding",
       iconName: "Coins",
       color: "text-emerald-500 bg-emerald-500/10 border-emerald-500/20",
+      image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?q=80&w=900&auto=format&fit=crop",
+      alt: "Scholarship grants and financial aid planning consultation",
       details: [
         "Active monitoring of state-sponsored, co-funded and university grants",
         "Need-based and merit-based application guidelines",
@@ -444,13 +461,15 @@ export default function ServicesSection({
       prefillInquiry: "360° Support Intake: Scholarships Match"
     },
     {
-      title: "Visa Compliance Liaison",
+      title: "Visa Compliance & Embassy",
       label: "Embassy Clearance",
       description: "Unraveling complex state requirements by auditing financial statements, preparing documents, and running simulated mocks.",
       metric: "98.7% Certified Consulate Pass Success Rate",
       badge: "Step 05 / Compliance",
       iconName: "PlaneTakeoff",
       color: "text-violet-500 bg-violet-500/10 border-violet-500/20",
+      image: "https://images.unsplash.com/photo-1544717305-2782549b5136?q=80&w=900&auto=format&fit=crop",
+      alt: "Embassy visa compliance and interview preparation with verified documents",
       details: [
         "Strict verification of source of funds, bank letters, and legal declarations",
         "Simulated embassy mock interviews with experienced immigration officials",
@@ -459,13 +478,15 @@ export default function ServicesSection({
       prefillInquiry: "360° Support Intake: Visa Support"
     },
     {
-      title: "Landing & Acculturation",
+      title: "Pre-Departure & Housing",
       label: "Pre-Flight & Housing",
       description: "Complete pre-departure advice on native bank accounts setup, health insurance, and secure student hostels.",
       metric: "15+ International Senior Alumni Networks",
       badge: "Step 06 / Relocation",
       iconName: "Compass",
       color: "text-rose-500 bg-rose-500/10 border-rose-500/20",
+      image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=900&auto=format&fit=crop",
+      alt: "International student landing, housing accommodation, and campus community welcome",
       details: [
         "Pre-flight briefings on campus life, culture, weather, and legal regulations",
         "Assistance in securing certified student accommodation near the campus",
@@ -545,6 +566,8 @@ export default function ServicesSection({
                   src={ACADEMIC_COUNSELING_HEADER_IMAGE}
                   alt="Vibrant international students working together on academic counseling and applications"
                   className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover/img:scale-[1.04]"
+                  loading="lazy"
+                  decoding="async"
                   referrerPolicy="no-referrer"
                 />
                 
@@ -560,7 +583,7 @@ export default function ServicesSection({
         {/* ========================================================================= */}
         {/* NEW HIGH-FIDELITY INTERACTIVE 360° JOURNEY CORE PLATFORM */}
         {/* ========================================================================= */}
-        <div className="mb-20 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-sm">
+        <div id="comprehensive-support" className="mb-20 bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-8 shadow-sm">
           <div className="text-center max-w-2xl mx-auto mb-8 space-y-2">
             <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-[#a88d3b]">Admissions Lifecycle Visualizer</span>
             <h3 className="font-display font-medium text-lg sm:text-xl text-slate-800">Explore our structured phases from pre-audit to landing</h3>
@@ -615,35 +638,60 @@ export default function ServicesSection({
             {/* Glowing top line */}
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-brand-blue-600 via-brand-gold-500 to-brand-green-600" />
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
               
               {/* Left Column Description */}
-              <div className="md:col-span-7 space-y-5 text-left">
+              <div className="lg:col-span-4 space-y-5 text-left">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-xl bg-white/10 flex items-center justify-center text-brand-gold-400 border border-white/5">
                     <ActivePhaseIcon className="h-5 w-5" />
                   </div>
                   <div>
                     <span className="text-[10px] font-mono uppercase tracking-widest text-slate-400 block">{activePhase.badge}</span>
-                    <h4 className="font-display font-bold text-xl sm:text-2xl text-white mt-0.5">{activePhase.title}</h4>
+                    <h4 className="font-display font-bold text-xl text-white mt-0.5">{activePhase.title}</h4>
                   </div>
                 </div>
 
-                <p className="text-slate-300 text-sm sm:text-base leading-relaxed font-sans font-medium">
+                <p className="text-slate-300 text-sm leading-relaxed font-sans font-medium">
                   {activePhase.description}
                 </p>
 
                 <div className="pt-4 border-t border-white/10">
                   <span className="text-[9px] font-mono uppercase tracking-widest text-brand-gold-400 block">Performance Index metric</span>
-                  <p className="text-sm sm:text-base font-display font-bold text-white mt-1 flex items-center gap-2">
+                  <p className="text-sm font-display font-bold text-white mt-1 flex items-center gap-2">
                     <Award className="h-4.5 w-4.5 text-brand-gold-500 shrink-0" />
                     <span>{activePhase.metric}</span>
                   </p>
                 </div>
               </div>
 
+              {/* Middle Column: Contextual Photographic Spotlight */}
+              <div className="lg:col-span-4 flex justify-center">
+                <div className="relative w-full aspect-[4/3] rounded-2xl overflow-hidden border border-white/15 shadow-xl bg-slate-900 group/spotlight">
+                  <img
+                    key={activePhase.image}
+                    src={activePhase.image}
+                    alt={activePhase.alt}
+                    className="w-full h-full object-cover transition-all duration-700 ease-out group-hover/spotlight:scale-105"
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/20 to-transparent pointer-events-none" />
+                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-[10px] font-mono font-bold tracking-wider text-brand-gold-300">
+                    <span className="bg-slate-950/80 backdrop-blur-md px-2.5 py-1 rounded-md border border-white/10 truncate">
+                      {activePhase.title}
+                    </span>
+                    <span className="text-emerald-400 flex items-center gap-1 bg-slate-950/80 backdrop-blur-md px-2 py-1 rounded-md border border-white/10 shrink-0">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      ACTIVE
+                    </span>
+                  </div>
+                </div>
+              </div>
+
               {/* Right Column Custom Actions & Details */}
-              <div className="md:col-span-5 space-y-4">
+              <div className="lg:col-span-4 space-y-4">
                 <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-3.5 text-left backdrop-blur-sm">
                   <h5 className="text-[10px] font-bold uppercase tracking-widest text-[#a88d3b] flex items-center gap-1.5">
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -699,12 +747,14 @@ export default function ServicesSection({
                 {/* Visual Image Header */}
                 <div className="relative h-44 sm:h-48 w-full overflow-hidden bg-slate-100">
                   <img
-                    src={SERVICE_IMAGES[service.id] || ACADEMIC_COUNSELING_HEADER_IMAGE}
+                    src={SERVICE_IMAGES[service.id] || SERVICE_FALLBACK_IMAGES[service.id] || ACADEMIC_COUNSELING_HEADER_IMAGE}
                     alt={service.title}
                     className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                    loading="lazy"
+                    decoding="async"
                     referrerPolicy="no-referrer"
                     onError={(e) => {
-                      (e.target as HTMLImageElement).src = ACADEMIC_COUNSELING_HEADER_IMAGE;
+                      (e.target as HTMLImageElement).src = SERVICE_FALLBACK_IMAGES[service.id] || ACADEMIC_COUNSELING_HEADER_IMAGE;
                     }}
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/30 to-transparent" />

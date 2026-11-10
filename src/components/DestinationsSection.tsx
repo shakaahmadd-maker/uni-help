@@ -1257,6 +1257,8 @@ export default function DestinationsSection({
                       src={customImageUrl} 
                       alt={dest.popularTitle} 
                       className="w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-105" 
+                      loading="lazy"
+                      decoding="async"
                       referrerPolicy="no-referrer"
                       onError={(e) => {
                         (e.target as HTMLImageElement).src = "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=800&q=80";
